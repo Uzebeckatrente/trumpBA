@@ -1,0 +1,10 @@
+*.csv
+*.npy
+*.p
+/npStores/*
+*.ndjson
+*.bin
+.idea/*
+trumpDataset/.idea/*
+__pycache__/*
+trumpDataset/__pycache__/*
