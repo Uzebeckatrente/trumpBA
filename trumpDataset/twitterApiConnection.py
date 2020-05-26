@@ -2,10 +2,17 @@ import tweepy
 import json
 from termcolor import colored
 
-consumer_key = "2JPVwVz9OYaCSAbJuSRC75DHY"
-consumer_secret = "NZqEGGRlMPKLkWnSCButQw1KfUpPKLwzcvhRSqDchLSQ1zgoQE"
-access_token = "325189589-BAlPOcBAa1MC8nZXnqE2bF2FxZ6q218mQwTWebeF"
-acces_token_secret = "NbSuOOD6HOUqnSm31YENKHLvmE1xNtPHa91TboMHOFpye"
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+SECRET_KEY = os.getenv("EMAIL")
+DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
+
+consumer_key = os.getenv("consumer_key")
+consumer_secret = os.getenv("consumer_secret")
+access_token = os.getenv("access_token")
+acces_token_secret = os.getenv("acces_token_secret")
 
 def createAuthorize():
 	try:

@@ -8,3 +8,4 @@
 trumpDataset/.idea/*
 __pycache__/*
 trumpDataset/__pycache__/*
+trumpDataset/.env
