@@ -1,13 +1,17 @@
 from colorama import Fore, Style
 
-import trumpBA
+# import trumpBA.trumpDataset;
+try:
+	from trumpDataset import *
+except:
+	from trumpBA.trumpDataset import *;
+# import trumpBA.trumpDataset
 import time
 # tweet = getTweetById(1194648339071016961)
 # print(tweet)
 # insertIntoDB(processTrumpTwitterArchiveFile());
 # populateCleanedTextColumn()
 # exit()
-# appendToDB(processTrumpTwitterArchiveFile(fileName = "addition.csv"))
 # exit()
 
 # populateDeletedColumn()
@@ -17,21 +21,112 @@ import time
 # graphFavsAndRtsByRatio()
 # graphFavsByApprRating()
 # analyzeSkewOfKeywords(False)
-
+# updateFavCounts()
 # favouriteOverTimeTrends()
 # exit()
-crawlFollowerCounts()
-exit()
-analyzeTopAndBottomPercentiles()
-exit()
-historgramFavCounts([favC[0] for favC in getTweetsFromDB(n=-1,conditions="purePres",returnParams=["favCount"])])
-exit()
-# graphPearsonsForApprFavOffset()
-exit()
-favouriteVsLengthTrends()
-favouriteOverTimeTrends()
-graphPearsonsForApprFavOffset()
+# populateAllCapsPercentageColumn()
+
+# print(computePercentageAllCaps("CHINA HAS ALREADY BEGUN AGRICULTURAL PURCHASES FROM OUR GREAT PATRIOT FARMERS &amp; RANCHERS!"))
+#
+# print(computePercentageAllCaps("#ThanksForDelivering @UPS! https://t.co/4Sis7Tme17"))
+# print(computePercentageAllCaps("I agree 100%! https://t.co/lFUfnLefxT"))
+# print(computePercentageAllCaps("I AM MAKING SOME LOUD NOISES @nose #NOISE"))
+# analyzeAllCapsPercentage()
 # exit()
+# analyzeTopAndBottomPercentiles()
+# exit()
+# analyzeTopAndBottomPercentiles()
+# exit()
+# historgramFavCounts([favC[0] for favC in getTweetsFromDB(n=-1,purePres=True,returnParams=["favCount"])])
+# graphPearsonsForApprFavOffset()
+
+# favouriteVsLengthTrends()
+# favouriteOverTimeTrends()
+# graphPearsonsForApprFavOffset()
+
+analyzeTopAndBottomPercentiles()
+for epochCount in range(3,101,3):
+	compareVocabOverTime(epochCount)
+# compareVocabOverTime(5)
+exit()
+
+
+np.random.seed(69)
+allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio"], orderBy= "publishTime desc")
+
+indices = np.random.permutation(len(allPresTweetsFavCountAndCleanedText))
+training_idx, test_idx = indices[:int(len(allPresTweetsFavCountAndCleanedText)*0.8)], indices[int(len(allPresTweetsFavCountAndCleanedText)*0.8):]
+training = []
+test = []
+for i in range(len(allPresTweetsFavCountAndCleanedText)):
+	if len(allPresTweetsFavCountAndCleanedText[i][1])>0:
+		if i in training_idx:
+			training.append(allPresTweetsFavCountAndCleanedText[i])
+		else:
+			test.append(allPresTweetsFavCountAndCleanedText[i])
+print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," test tweets",Style.RESET_ALL);
+
+allCapsClassifier = AllCapsClassifier()
+
+allCapsClassifier.train(training);
+# allCapsClassifier.test(test,title="test data");
+allCapsClassifier.test(training,training=False,title="train data")[0];
+misClassifiedsAllCaps =allCapsClassifier.test(test,training=False,title="tist data")[0];
+misClassifiedsAllCaps.sort(key=lambda tup: tup[0]);
+#
+naiveBayesClassifier = PureBayesClassifier()
+naiveBayesClassifier.train(training,testData = test,retabulate = False)
+naiveBayesClassifier.predict("peaceofficersmemorialday")
+print(Fore.CYAN,"test error: ")
+misClassifiedNaive = naiveBayesClassifier.test(test, title="naive bayes baybayy")
+print(Fore.LIGHTRED_EX,"train error: ")
+naiveBayesClassifier.test(training, title="training naive")
+#
+
+
+
+
+booster = MixedBoostingBayesClassifier()
+
+booster.train(training,testData = test,retabulate = False)
+
+
+
+print(Fore.CYAN,"test error onlyLen True: ")
+misClassifiedsBooster = booster.test(test,title="post")
+
+allMisClassifieds = []
+for l in misClassifiedNaive:
+	allMisClassifieds.extend(l)
+for l in misClassifiedsBooster:
+	allMisClassifieds.extend(l)
+allMisClassifieds.extend(misClassifiedsAllCaps);
+
+
+print("\n\n\n")
+print("misclassified total: ")
+misClassifiedCounts = {}
+for tweet in set(allMisClassifieds):
+	try:
+		misClassifiedCounts[allMisClassifieds.count(tweet)] += 1;
+	except:
+		misClassifiedCounts[allMisClassifieds.count(tweet)] = 1;
+print(misClassifiedCounts);
+exit()
+
+
+
+print("\n\n")
+print(Fore.LIGHTRED_EX,"train error: ")
+booster.test(training,title="training error")
+
+
+
+
+exit()
+
+analyzeOverUnderMeanSkewOfKeywords(loadFromStorage=True,tweetsHash="purePres")
+exit()
 # groupTweetsByMonthAndApprRating()
 # sourceApprovalRatings()
 # graphFavsAndRtsByRatio()
@@ -67,7 +162,7 @@ graphPearsonsForApprFavOffset()
 
 
 # computeMostCommonWordsAndBigrams()
-analyzeOverUnderMeanSkewOfKeywords(False)
+
 exit()
 
 

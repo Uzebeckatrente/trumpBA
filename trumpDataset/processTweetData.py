@@ -1,23 +1,21 @@
-import trumpDataset.basisFuncs
-from trumpDataset.basicFuncs import *
+from .basisFuncs import *
 
-from trumpDataset.favs import getAverageFavCountPresTweets
-from trumpDataset.media import extractMediaFromTweet
+
+
+from .favs import getMeanFavCountPresTweets
+from .media import extractMediaFromTweet
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.expand_frame_repr', False)
 PYTHONHASHSEED = 0
 
-from colorama import Fore, Style
-from keras import Sequential
-from keras.layers import Dense
 
-from trumpDataset.stats import reduceDimensPCA
-from trumpDataset.twitterApiConnection import *
-from trumpDataset.part3funcs import *
+from .stats import reduceDimensPCA
+from .twitterApiConnection import *
+from .part3funcs import *
 import matplotlib.pyplot as plt
 
-from trumpDataset.visualization import graphTwoDataSetsTogether, boxAndWhiskerForKeyWordsFavs
+from .visualization import graphTwoDataSetsTogether, boxAndWhiskerForKeyWordsFavs
 
 
 
@@ -72,8 +70,8 @@ def analyzeCoverageOfNMostPopularWordsAndMMostPopularBigrams(words, bigrams, twe
 
 
 
-def analyzeTopAndBottomPercentiles(nGrams = [1,2,3,4]):
-	tweets = getTweetsFromDB(conditions="purePres",orderBy="favCount asc", returnParams=["favCount","cleanedText"])
+def analyzeTopAndBottomPercentiles(nGrams = [1,2,3,4],tweets = None):
+	tweets = getTweetsFromDB(purePres=True,orderBy="favCount asc", returnParams=["favCount","cleanedText"])
 	topNGramsByPercentage = {}
 	bottomNGramsByPercentage = {}
 
@@ -90,7 +88,7 @@ def analyzeTopAndBottomPercentiles(nGrams = [1,2,3,4]):
 			computeMostCommonnGrams(topNPercent, n)
 			computeMostCommonnGrams(bottomNPercent,n)
 
-			tweetHashes = [tweetHash(topNPercent), tweetHash(bottomNPercent)]
+			tweetHashes = [hashTweets(topNPercent), hashTweets(bottomNPercent)]
 			nMostPopularnGramsWithCountsTop, nMostPopularnGramsWithCountsBottom = getMMostLeastPopularnGramsWithCounts(
 				25, n, tweetHashes =tweetHashes, percentage = True);
 			topNGramsForThisPercent[n].append(nMostPopularnGramsWithCountsTop)

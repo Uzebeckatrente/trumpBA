@@ -1,52 +1,7 @@
-from trumpDataset.basisFuncs import *
-import emoji
+from .basisFuncs import *
+from .part3funcs import normalize_document
 
 
-def normalize_document(doc):
-    # lower case and remove special characters\whitespaces
-	doc = doc.lower()
-	doc = doc.strip()
-	doc = doc.replace('\n', ' ')
-
-
-	rtIndex = doc.find("rt @");
-
-	if doc[-1:] == "…":
-
-		lastSpaceIndex = len(doc)-doc[::-1].index(" ")-1
-		doc = doc[:lastSpaceIndex]
-
-	###filter out rts
-	if rtIndex != -1:
-		firstAtIndex = doc.find(":")
-		doc = doc[2 + firstAtIndex:];
-
-	doc = emoji.get_emoji_regexp().sub("xemojix ", doc)
-
-	doc = re.sub("&amp;", "and", doc)
-	doc = re.sub("w/", "with", doc)
-	doc = re.sub("(https://.* )|(https://[\S]*)", "", doc)
-	doc = re.sub('[/\-]', ' ', doc)
-	doc = re.sub(r'[^a-zA-Z0-9\s\@\#]', '', doc, re.I|re.A)
-	doc=re.sub("\.", "", doc)
-
-
-	nlpTweetText = nlp(doc)
-
-	wordLemmas = []
-	for token in nlpTweetText:
-		if unworthynessOfToken(token):
-			continue;
-
-		elif token.lemma_ in ['pm','am']:
-			wordLemmas.append(token.lemma_[0]+"."+token.lemma_[1]+".")
-		elif token.string.strip()[0] == "@":
-			wordLemmas.append(token.string.strip())
-		else:
-			wordLemmas.append(token.lemma_)
-
-
-	return " ".join(wordLemmas);
 	# tokens = doc.split(" ");
 	# # filter stopwords out of document
 	#
@@ -68,14 +23,12 @@ def populateCleanedTextColumnThreadTarget(threadNumber, tweets,tuplesDict):
 
 	for tweet in tweets:
 
-		tweetText = normalize_document(tweet[0])
+		cleanedText = normalize_document(tweet[1])
 
 		###filter out urls
 
 
-
-
-		tuples.append((tweetText,tweet[-3]))
+		tuples.append((cleanedText,tweet[0]))
 		# words = [word in wordLemmas if word not in nlp.]
 		if counter%100 == 0:
 			print("thread: ",threadNumber," ",counter/len(tweets))
@@ -88,7 +41,8 @@ def populateCleanedTextColumnThreadTarget(threadNumber, tweets,tuplesDict):
 def populateCleanedTextColumn():
 	updateFormula = "UPDATE "+mainTable+" SET cleanedText = %s WHERE id = %s";
 
-	tweets=getTweetsFromDB(n=-1, conditions=[], returnParams="*")
+	tweets=getTweetsFromDB(n=-1, conditions=["cleanedText is null"], returnParams=["id","tweetText"])
+	print("we've got ",len(tweets)," tweets to update!")
 	numThreads = 100;
 	tuples = [];
 	tuplesDict = {}
@@ -105,7 +59,8 @@ def populateCleanedTextColumn():
 	for index, thread in enumerate(threads):
 		thread.join()
 		tuples.extend(tuplesDict[index])
-	print("all joined")
+	print("all joined",len(tuples))
 
 	mycursor.executemany(updateFormula,tuples)
 	mydb.commit()
+	print("committed")

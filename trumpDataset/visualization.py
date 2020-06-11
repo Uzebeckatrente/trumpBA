@@ -2,8 +2,8 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
-from trumpDataset.stats import pearsonCorrelationCoefficient
-from trumpDataset.basisFuncs import *
+from .stats import pearsonCorrelationCoefficient
+from .basisFuncs import *
 
 def getTimeObjectOfLastSecondOfGivenDayForTimestamp(timestamp):
 	return timestamp - datetime.timedelta(hours=timestamp.hour, minutes=timestamp.minute,seconds=timestamp.second) + datetime.timedelta(days=1) - datetime.timedelta(seconds=1);
@@ -12,7 +12,8 @@ def getTimeObjectOfLastSecondOfGivenDayForTimestamp(timestamp):
 
 
 
-def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2):
+def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2, scatter = False):
+	print("scatty d: ",scatter)
 	minLen = min(len(dataset1),len(dataset2))
 	print("minny: ",minLen)
 
@@ -24,8 +25,8 @@ def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2):
 	par1 = host.twinx()
 
 	# host.set_xlabel("months")
-	# host.set_ylabel("favourite count")
-	# par1.set_ylabel("approval rating")
+	host.set_ylabel(label1)
+	par1.set_ylabel(label2)
 
 	color1 = plt.cm.viridis(0)
 	color2 = plt.cm.viridis(0.5)
@@ -35,20 +36,24 @@ def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2):
 	dataset1 = dataset1[:minLen]
 	dataset2 = dataset2[:minLen]
 
-
-	pDS1, = host.plot(xes, dataset1, color=color1, label=label1)
+	if not scatter:
+		pDS1, = host.plot(xes, dataset1, color=color1, label=label1)
+	else:
+		pDS1, = host.scatter(xes, dataset1, color=color1, label=label1)
 	host.set_ylim(min(dataset1), max(dataset1))
 	par1.set_ylim(min(dataset2), max(dataset2))
 	# host.set_ylim(0,10000)
 	# par1.set_ylim(0, 10000)
 
-
-	pDS2, = par1.plot(xes, dataset2, color=color2, label=label2)
+	if not scatter:
+		pDS2, = par1.plot(xes, dataset2, color=color2, label=label2)
+	else:
+		pDS2, = par1.scatter(xes, dataset2, color=color2, label=label2)
 
 	lns = [pDS1, pDS2]
 	host.legend(handles=lns, loc='best')
 	pearson = pearsonCorrelationCoefficient(dataset1, dataset2);
-	print("pearson: ",pearson)
+
 	plt.title("pearson correlation coefficient: "+str(pearson))
 
 	par1.yaxis.label.set_color(pDS2.get_color())
@@ -59,6 +64,12 @@ def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2):
 
 
 def computeXandYForPlotting(tweets, daysPerMonth):
+	'''
+
+	:param tweets: *
+	:param daysPerMonth:
+	:return:
+	'''
 	avgFavCounts = [];
 	avgRtCounts = []
 
@@ -147,7 +158,7 @@ def historgramFavCounts(favCounts):
 
 
 
-def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav):
+def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,title):
 	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
 	fig.subplots_adjust(left=0.06, right=0.94)
 
@@ -164,7 +175,7 @@ def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav):
 
 	plt.plot(favX,[avgFav]*len(favX),linestyle='--')
 	plt.boxplot(data, positions=x, notch=False,showfliers=True)
-
+	plt.title(title)
 
 	plt.xticks(x,keywords)
 	plt.show()

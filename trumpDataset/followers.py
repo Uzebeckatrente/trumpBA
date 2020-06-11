@@ -1,8 +1,9 @@
+from .visualization import computeXandYForPlotting,graphTwoDataSetsTogether
+from .basisFuncs import *
 
-from trumpDataset.basisFuncs import *
 
-
-
+def foo():
+	print("bar")
 
 def crawlFollowersThreadTarget(threadNum, dates, tupleDict, totalNumberOfDates):
 
@@ -40,11 +41,7 @@ def crawlFollowersThreadTarget(threadNum, dates, tupleDict, totalNumberOfDates):
 	tupleDict[threadNum].extend(tuples);
 	print("finished thread :",threadNum);
 
-def timeStampToDateTime(ts):
-	return datetime.datetime(int(ts[0:4]),int(ts[4:6]),int(ts[6:8]))
 
-def dateTimeToMySQLTimeStamp(dt):
-	return str(dt.year)+":"+str(dt.month)+":"+str(dt.day)+" 00:00:00"
 
 def crawlFollowerCounts():
 	'''
@@ -101,3 +98,35 @@ def crawlFollowerCounts():
 		mycursor.executemany(insertFormula,tuples)
 		mydb.commit()
 	print("fin",tupleDict)
+
+def getFollowerCount(timeFrame = "purePres"):
+	if timeFrame != "purePres":
+		raise("not yet implemented lol")
+
+
+	mycursor.execute("select day, followerCount from followersByDay where day > \"2016:11:01 00:00:00\"")
+	followers = mycursor.fetchall()
+
+	return followers
+
+
+
+def graphFollowerCountByFavCount():
+	daysPerMonth = 30;
+	followersCounts = getFollowerCount()
+
+	favs = getTweetsFromDB(purePres=True,returnParams=["cleanedText","publishTime","rtCount","favCount"],orderBy="publishTime asc")
+
+	avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, tweetIndicesByMonth = computeXandYForPlotting(favs,daysPerMonth=daysPerMonth);
+
+	assert(months[0].day == followersCounts[0][0].day and months[0].month == followersCounts[0][0].month and months[0].year == followersCounts[0][0].year)
+
+	followersCounts = followersCounts[::daysPerMonth]
+	minLen = min(len(months),len(followersCounts));
+
+	justFollowerCounts = [c[1] for c in followersCounts[:minLen]]
+
+	mix = max(justFollowerCounts)
+	print(mix)
+
+	graphTwoDataSetsTogether(avgFavCounts[:minLen],"favCounts",justFollowerCounts,"follower counts")

@@ -1,5 +1,5 @@
 import fasttext
-from trumpDataset.basisFuncs import *
+from .basisFuncs import *
 
 def writeCleanedTotxtFile(fileName = "trumpDataset/clean.txt"):
 	f = open(fileName,"w")
@@ -31,7 +31,7 @@ def getTopNVectorsForTweet(model, tweetText, n, vectorLen):
 
 	words = [str(token) for token in nlpTweetText if not unworthynessOfToken(token)]
 
-	wordsInDescendingFrequencyFile =open("trumpDataset/npStores/wordsInDescendingFrequency.p","rb")
+	wordsInDescendingFrequencyFile =open("trumpBA/trumpDataset/npStores/wordsInDescendingFrequency.p","rb")
 	wordsInDescendingFrequency = pickle.load(wordsInDescendingFrequencyFile);
 	wordsInDescendingFrequency = [word[0] for word in wordsInDescendingFrequency]
 	topNIndices = []

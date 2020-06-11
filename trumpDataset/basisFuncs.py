@@ -9,11 +9,18 @@ import time
 import pandas as pd
 import pickle
 import re
+import datetime
 from colorama import Fore, Style
 import numpy as np
+import spacy
+nlp = spacy.load("en")
 
-from trumpBA.trumpDataset.twitterApiConnection import *
+from .twitterApiConnection import *
 relevancyDateThreshhold = "where publishTime > \"2016:11:01 00:00:00\""
+#publishTime > "2017-02-20 00:00:00"
+
+nGramStorageIndicesSkew = {"nGram":0, "count":1, "std":2, "skew":3, "favs":4}
+nGramStorageIndicesProbs = {"nGram":0, "count":1, "std":2, "binProbs":3}
 
 
 mydb = mysql.connector.connect(host="localhost",user="root",passwd="felixMySQL",database="trump");
@@ -33,10 +40,18 @@ def computeBigrams(tweetWords):
 	return [tweetWords[i] + " " + tweetWords[i + 1] for i in range(len(tweetWords) - 1)]
 
 
-def tweetHash(tweets):
+def hashTweets(tweets):
 	tweets.sort(key= lambda tup: tup[1]+str(tup[0]), reverse=True)
 	myString = str(tweets);
 	return hasher(myString.encode()).hexdigest()
+
+def dateTimeToInt(obj, old = datetime.datetime(year=2017, day = 20, month = 2)):
+	'''
+	in order to be graphable abstractly
+	:param obj:
+	:return:
+	'''
+	return (obj-old).total_seconds()
 
 
 def getTopiPercentOfList(i,l,ascending = True):
@@ -54,7 +69,7 @@ def getTopiElementsOfList(i,l,ascending = True):
 
 def getTopBottomiPercentOfPurePresTweets(i,tweets = None):
 	if tweets == None:
-		tweets = getTweetsFromDB(conditions="purePres", orderBy="favCount asc",
+		tweets = getTweetsFromDB(purePres=True, orderBy="favCount asc",
 								 returnParams=["favCount", "cleanedText"])
 
 	return getTopiPercentOfList(i,tweets,True),getTopiPercentOfList(i,tweets,False)
@@ -62,7 +77,7 @@ def getTopBottomiPercentOfPurePresTweets(i,tweets = None):
 
 def getTopBottomiTweetsOfPurePresTweets(i, tweets=None):
 	if tweets == None:
-		tweets = getTweetsFromDB(conditions="purePres", orderBy="favCount asc",
+		tweets = getTweetsFromDB(purePres=True, orderBy="favCount asc",
 								 returnParams=["favCount", "cleanedText"])
 	return getTopiElementsOfList(i,tweets,True),getTopiElementsOfList(i,tweets,False)
 
@@ -73,12 +88,13 @@ def getApprovalRatings():
 	ratings = mycursor.fetchall()
 	return ratings;
 
-def getFavsByKeyword(keyword,rts = True):
+def getFavsByNGram(keyword, rts = True):
 	conditions = ["cleanedText like \"%" + keyword + "%\"","president","deleted = 0"]
 	if not rts:
 		conditions.append("isRt = 0")
-	tweets = getTweetsFromDB(n=-1, conditions=conditions, returnParams=[ "favCount"]);
-	return tweets
+	favs = getTweetsFromDB(n=-1, conditions=conditions, returnParams=[ "favCount"], orderBy="favCount");
+	return [fav[0] for fav in favs]
+
 
 
 
@@ -91,6 +107,11 @@ def getRootUrl(url):
 	except:
 		return "checkme!"
 
+def timeStampToDateTime(ts):
+	return datetime.datetime(int(ts[0:4]),int(ts[4:6]),int(ts[6:8]))
+
+def dateTimeToMySQLTimeStamp(dt):
+	return str(dt.year)+":"+str(dt.month)+":"+str(dt.day)+" 00:00:00"
 
 def camlify(string, firstLetterCapital = True):
 	string = string.rstrip().lstrip()
@@ -104,7 +125,18 @@ def camlify(string, firstLetterCapital = True):
 		ret += s[0].upper()+s[1:].lower()
 	return ret;
 
-def getTweetsFromDB(n=-1, conditions=[], returnParams="*",orderBy = "publishTime desc"):#president = False, allParams = False,inclRts = False):
+def on_plot_hover(event,plot):
+    # Iterating over each data member plotted
+    for curve in plot.get_lines():
+        # Searching which data member corresponds to current mouse position
+        if curve.contains(event)[0]:
+            print("over %s" % curve.get_label())
+
+def randomHexColor():
+	#generates a random color string
+	return "#"+('000000'+hex(np.random.randint(16777216))[2:])[-6:].upper();
+
+def getTweetsFromDB(n=-1,purePres = False, conditions=[], returnParams="*",orderBy = "publishTime desc"):#president = False, allParams = False,inclRts = False):
 	'''
 	returns all columns of latest n tweets of DJT
 	:param n: -1 will return all tweets
@@ -112,13 +144,17 @@ def getTweetsFromDB(n=-1, conditions=[], returnParams="*",orderBy = "publishTime
 	:return: if allParams: [(tweetText, publishTime, rtCount, favCount, isRt, deleted, id),...];
 			else: [tweetText,...]
 	'''
-	if conditions == "purePres":
-		conditions = purePresConditions
+	if purePres:
+		conditions.extend(purePresConditions)
+
 	if len(conditions)>0:
 		whereString = "where "
 		for index, condition in enumerate(conditions):
 			if condition == "president":
 				whereString += ("publishTime > \"2017-02-20 00:00:00\"")
+				favCountUpThresh = datetime.datetime.now()-datetime.timedelta(days=4);
+				mySqlTimeStamp = dateTimeToMySQLTimeStamp(favCountUpThresh);
+				whereString += (" and publishTime <= \""+mySqlTimeStamp+"\"");
 			else:
 				whereString += condition
 			if index < len(conditions)-1:
@@ -132,7 +168,7 @@ def getTweetsFromDB(n=-1, conditions=[], returnParams="*",orderBy = "publishTime
 
 	if returnParams != "*":
 		returnParams = ", ".join(returnParams)
-	query = "select "+returnParams+" from "+mainTable+" "+whereString + "  order by "+orderBy+" "+limiter;
+	query = "select "+returnParams+" from "+mainTable+" "+whereString + " order by "+orderBy+" "+limiter;
 
 	mycursor.execute(query)
 	tweets = mycursor.fetchall()
@@ -149,7 +185,7 @@ def insertIntoDB(corpus):
 	# mycursor.execute("delete from trumptwitterarchive");
 	ind = 0;
 	tuples = []
-	insertFormula = "INSERT INTO "+mainTable+" (id, tweetText, publishTime, rtCount, favCount, isRt, deleted, mediaType) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+	insertFormula = "INSERT INTO "+mainTable+" (id, tweetText, publishTime, rtCount, favCount, isRt, deleted, mediaType, isReply, allCapsRatio) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s,%s)"
 	# firstTweet =corpus[0]
 
 	counter = 0;
@@ -197,7 +233,7 @@ def insertIntoDB(corpus):
 					if len(tweet.entities['urls'])>0:
 						mediaType = "articleLink"
 
-			tuples.append((id, tweetText, publishTimeUTC, rtCount, favCount, isRt, 0, mediaType))
+			tuples.append((id, tweetText, publishTimeUTC, rtCount, favCount, isRt, 0, mediaType,-1,-1))
 
 		for i in range(len(hundredTweetIds)):
 			id = hundredTweetIds[i]
@@ -218,7 +254,7 @@ def insertIntoDB(corpus):
 					media = "none"
 				else:
 					media = "checkme!"
-				tuples.append((id, tweetText, publishTime, rtCount, favCount, isRt, 1, media))
+				tuples.append((id, tweetText, publishTime, rtCount, favCount, isRt, 1, media,-1,-1))
 		counter += 1
 		try:
 			hundredTweetIds = [int(tweet['id_str\n']) for tweet in corpus[counter * 100:(counter + 1) * 100]];
@@ -231,13 +267,23 @@ def insertIntoDB(corpus):
 		try:
 			mycursor.execute(insertFormula, tuples[i])
 		except:
-			print("failed on ", i, ": ", tuples[i][-1]);
+			print("failed on ", i, ": ", tuples[i]);
 			print(insertFormula % tuples[i]);
 			print(getTweetById(tuples[i][-1]))
 
 	print("were tryin")
 	mydb.commit()
 
+
+def extractMediaFromTweet(tweet):
+	try:
+		tweet = tweet + " "
+		beginningIndex = tweet.index("https://");
+		endingIndex = tweet[beginningIndex:].index(" ");
+		media =  tweet[beginningIndex:beginningIndex+endingIndex];
+		return media;
+	except:
+		return -1
 
 def convertDateToTimestamp(s):###for s in format "mm-dd-yyyy hh:mm:ss"
 	return s[6:10]+"-"+s[:5]+s[10:];
@@ -262,14 +308,14 @@ def processTrumpTwitterArchiveFile(fileName = None):
 	f = None;
 	if fileName == None:
 		try:
-			f = open("trumpTwitterArchiveDS.csv", "r");
+			f = open("trumpBA/trumpTwitterArchiveDS.csv", "r");
 		except:
-			f = open("trumpDataset/trumpTwitterArchiveDS.csv", "r");
+			f = open("trumpBA/trumpDataset/trumpTwitterArchiveDS.csv", "r");
 	else:
 		try:
-			f = open(fileName, "r");
+			f = open("trumpBA/"+fileName, "r");
 		except:
-			f = open("trumpDataset/"+fileName, "r");
+			f = open("trumpBA/trumpDataset/"+fileName, "r");
 	lines = f.readlines()
 	params = lines[0]
 	parser = CsvParser(params)
@@ -398,3 +444,4 @@ def processRealDonaldTrumpFile():
 
 	Which day of the week; holidays? when are people on twitter more
 	'''
+

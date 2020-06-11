@@ -1,5 +1,5 @@
 import re
-
+from .basisFuncs import *
 
 
 def populateMediaTypeColumn():
@@ -87,15 +87,7 @@ def removeMediaFromTweet(tweet):
 	except:
 		return tweet
 
-def extractMediaFromTweet(tweet):
-	try:
-		tweet = tweet + " "
-		beginningIndex = tweet.index("https://");
-		endingIndex = tweet[beginningIndex:].index(" ");
-		media =  tweet[beginningIndex:beginningIndex+endingIndex];
-		return media;
-	except:
-		return -1
+
 
 def getPresidentTweetsWithMedia(expecting = False, mediaType = False , limit = 100):
 	if expecting:
