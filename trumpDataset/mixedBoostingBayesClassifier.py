@@ -10,6 +10,13 @@ from keras import Sequential
 # from keras import initializers;
 from keras.layers import Dense
 
+'''
+In this file:
+• a naive-bayes-esque 50/50 classifier (72%)
+• an MLP 10/90 classifier (67%)
+
+'''
+
 
 class MLPPopularity():
 
@@ -100,13 +107,17 @@ class MLPPopularity():
 		actualFavs = [t[0] for t in testTweets];
 		# predictionMatrix = np.array([-123]*predictionMatrix.shape[0]);
 		predictions = self.model.predict_classes(predictionMatrix)
+
+		predictionsAggregator = {0:0,1:0};
+		correctPredictionsAggregator = {0: 0, 1: 0};
+
 		for i in range(predictions.shape[0]):
 			prediction = predictions[i][0];
 			target = targetMatrix[i][0]
 			prod = prediction*target;
 			if prediction == 0 and target == 0 or prediction > 0 and target > 0:
-				numCorrect += 1;
-
+				correctPredictionsAggregator[prediction] += 1;
+			predictionsAggregator[prediction] += 1;
 
 
 		xes = [i for i in range(len(testTweets))];
@@ -118,7 +129,7 @@ class MLPPopularity():
 		plt.legend()
 		plt.show()
 
-		print(numCorrect/len(testTweets))
+		print(0.5*(correctPredictionsAggregator[0]/predictionsAggregator[0])+0.5*(correctPredictionsAggregator[1]/predictionsAggregator[1]));
 
 
 
@@ -732,6 +743,3 @@ class MixedBoostingBayesClassifier():
 		self.m,self.c = ols(xMatrix,yMatrix)
 
 
-'''
-10 or 15 minutes
-'''

@@ -11,8 +11,13 @@ import statsmodels.api as sm
 from sklearn.kernel_ridge import KernelRidge
 
 
-# from keras import Sequential
-# from keras.layers import Dense
+'''
+this file contains several classifiers which I don't/didn't expect to perform super well:
+all-caps;
+OLS (50/50 or 10/90)
+Poisson (rounded log count as bins)
+'''
+
 
 
 class AllCapsClassifier():
