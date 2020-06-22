@@ -12,7 +12,7 @@ def getTimeObjectOfLastSecondOfGivenDayForTimestamp(timestamp):
 
 
 
-def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2, scatter = False):
+def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2, scatter = False, xes = None,title=None):
 	print("scatty d: ",scatter)
 	minLen = min(len(dataset1),len(dataset2))
 	print("minny: ",minLen)
@@ -31,7 +31,11 @@ def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2, scatter = False
 	color1 = plt.cm.viridis(0)
 	color2 = plt.cm.viridis(0.5)
 	# color3 = plt.cm.viridis(1.0)
-	xes = [i for i in range(minLen)]
+
+	try:
+		xes = xes[:minLen]
+	except:
+		xes = [i for i in range(minLen)]
 
 	dataset1 = dataset1[:minLen]
 	dataset2 = dataset2[:minLen]
@@ -53,8 +57,10 @@ def graphTwoDataSetsTogether(dataset1, label1, dataset2, label2, scatter = False
 	lns = [pDS1, pDS2]
 	host.legend(handles=lns, loc='best')
 	pearson = pearsonCorrelationCoefficient(dataset1, dataset2);
-
-	plt.title("pearson correlation coefficient: "+str(pearson))
+	if title == None:
+		plt.title("pearson correlation coefficient: "+str(round(pearson,2)))
+	else:
+		plt.title(title);
 
 	par1.yaxis.label.set_color(pDS2.get_color())
 	plt.show()
@@ -122,24 +128,25 @@ def computeXandYForPlotting(tweets, daysPerMonth):
 
 def historgramFavCounts(favCounts):
 
+	# favCounts.sort(reverse=False)
+	# maxFavCount = favCounts[-1]
+	# colors = ['b','r','black']
+	# for boxSize in range(1,10):
+	# 	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+	# 	fig.subplots_adjust(left=0.06, right=0.94)
+	# 	# boxSize *= 1000
+	# 	boxSize *= 0.1
+	# 	boxes = [boxSize*i for i in range(1,int(maxFavCount/(boxSize))+1)]
+	# 	print("boxy")
+	# 	N, bins, patches = plt.hist(favCounts,bins=boxes,)
+	# 	print("histy")
+	# 	for i in range(len(patches)):
+	# 		patches[i].set_facecolor(colors[i%3])
+	# 	print("patchy")
+	#
+	# 	plt.show()
 	favCounts.sort(reverse=False)
-	maxFavCount = favCounts[-1]
-	colors = ['b','r','black']
-	for boxSize in range(1,10):
-		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
-		fig.subplots_adjust(left=0.06, right=0.94)
-		boxSize *= 1000
-		boxes = [boxSize*i for i in range(1,int(maxFavCount/(boxSize))+1)]
-		print("boxy")
-		N, bins, patches = plt.hist(favCounts,bins=boxes,)
-		print("histy")
-		for i in range(len(patches)):
-			patches[i].set_facecolor(colors[i%3])
-		print("patchy")
-
-		plt.show()
-	favCounts.sort(reverse=False)
-	favCounts = np.array([np.log(fvc) if fvc >0 else 0 for fvc in favCounts])
+	favCounts = np.array([round(np.log(fvc),0) if fvc >0 else 0 for fvc in favCounts])
 	maxFavCount = favCounts[-1]
 	colors = ['b', 'r', 'black']
 	for boxSize in range(1, 20):
@@ -147,6 +154,7 @@ def historgramFavCounts(favCounts):
 		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
 		fig.subplots_adjust(left=0.06, right=0.94)
 		print("boxy")
+		boxSize = int(maxFavCount);
 		N, bins, patches = plt.hist(favCounts, bins = boxSize)
 		print("histy")
 		for i in range(len(patches)):

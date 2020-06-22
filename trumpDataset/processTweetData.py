@@ -67,6 +67,17 @@ def analyzeCoverageOfNMostPopularWordsAndMMostPopularBigrams(words, bigrams, twe
 	return intersections,wordIntersections,bigramIntersections,empties
 
 
+def visualizeFavCountDistributionForKeyword(keyWord, only = True):
+
+
+	plt.xticks([],[])
+	keyWordFormula = keyWord
+	if not only:
+		keyWordFormula = "%"+keyWord+"%"
+	tweets = getTweetsFromDB(purePres=True, returnParams=["favCount"], conditions=["cleanedText like \""+keyWordFormula+"\""], orderBy="favCount asc")
+	plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
+	plt.title("favourite distribution for all " + str(len(tweets)) +" tweets with just the term \"" + str(keyWord)+"\"")
+	plt.show();
 
 
 

@@ -15,6 +15,8 @@ import numpy as np
 import spacy
 nlp = spacy.load("en")
 
+lastEpochAndGram = (None,None);
+
 from .twitterApiConnection import *
 relevancyDateThreshhold = "where publishTime > \"2016:11:01 00:00:00\""
 #publishTime > "2017-02-20 00:00:00"
@@ -27,7 +29,7 @@ mydb = mysql.connector.connect(host="localhost",user="root",passwd="felixMySQL",
 mycursor = mydb.cursor(buffered=True)
 
 mainTable = "tta2"
-purePresConditions=["president","isRt = 0","deleted = 0"]
+purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0"]
 
 def getTweetById(id: int):
 	return getTweetsById([id])
@@ -125,12 +127,25 @@ def camlify(string, firstLetterCapital = True):
 		ret += s[0].upper()+s[1:].lower()
 	return ret;
 
-def on_plot_hover(event,plot):
-    # Iterating over each data member plotted
-    for curve in plot.get_lines():
-        # Searching which data member corresponds to current mouse position
-        if curve.contains(event)[0]:
-            print("over %s" % curve.get_label())
+def on_plot_hover(event,plot,nGramsForAllEpochsRegularized):
+	# Iterating over each data member plotted
+	for curve in plot.get_lines():
+		# Searching which data member corresponds to current mouse position
+		if curve.contains(event)[0]:
+			epoch = int(round(event.xdata,0));
+			gram = curve.get_label();
+			if gram[:5] == "_line":
+				continue;
+			global lastEpochAndGram;
+			if (epoch,gram) == lastEpochAndGram:
+				return;
+			else:
+				lastEpochAndGram=(epoch,gram)
+			print("gram: ",gram," epoch: ",epoch," topo:",round(nGramsForAllEpochsRegularized[epoch][gram][2],2)," skew: ",round(nGramsForAllEpochsRegularized[epoch][gram][1],2)," count: ",round(nGramsForAllEpochsRegularized[epoch][gram][0],2))
+
+
+	# for line in plot.get_lines():
+	# 	print(line);
 
 def randomHexColor():
 	#generates a random color string
@@ -152,7 +167,7 @@ def getTweetsFromDB(n=-1,purePres = False, conditions=[], returnParams="*",order
 		for index, condition in enumerate(conditions):
 			if condition == "president":
 				whereString += ("publishTime > \"2017-02-20 00:00:00\"")
-				favCountUpThresh = datetime.datetime.now()-datetime.timedelta(days=4);
+				favCountUpThresh = datetime.datetime.now()-datetime.timedelta(days=0);
 				mySqlTimeStamp = dateTimeToMySQLTimeStamp(favCountUpThresh);
 				whereString += (" and publishTime <= \""+mySqlTimeStamp+"\"");
 			else:
@@ -169,12 +184,10 @@ def getTweetsFromDB(n=-1,purePres = False, conditions=[], returnParams="*",order
 	if returnParams != "*":
 		returnParams = ", ".join(returnParams)
 	query = "select "+returnParams+" from "+mainTable+" "+whereString + " order by "+orderBy+" "+limiter;
-
 	mycursor.execute(query)
 	tweets = mycursor.fetchall()
 
 	return tweets
-
 
 
 

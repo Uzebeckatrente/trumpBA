@@ -4,7 +4,7 @@ from .basisFuncs import *
 from .part3funcs import getMostPopularWordsOverCountNMostPopularBigramsOverCount, computeMostCommonnGrams, \
 	getnGramsWithOverMOccurences,extractNGramsFromCleanedText
 from .stats import pearsonCorrelationCoefficient
-from .visualization import boxAndWhiskerForKeyWordsFavs, computeXandYForPlotting
+from .visualization import boxAndWhiskerForKeyWordsFavs, computeXandYForPlotting,graphTwoDataSetsTogether;
 
 
 def getMedianFavCountPresTweets(favs = None):
@@ -141,6 +141,7 @@ def updateFavCounts():
 
 	counter = 0;
 	diffs=[]
+	oldDiffs = []
 	tuples = []
 	while True:
 		print(counter*100/len(tweets))
@@ -155,16 +156,19 @@ def updateFavCounts():
 		retTweets = getTweetsById(hundredTweetIds)
 		returnedIds = [tweet.id for tweet in retTweets]
 
+
 		for retTweet in retTweets:
 			id = retTweet.id;
 			newFavCount = retTweet.favorite_count;
 			prevFavCount = hundredTweetDict[id];
-			diffs.append(newFavCount-prevFavCount);
+			oldDiffs.append(newFavCount-prevFavCount);
+			diffs.append((str(id),str(newFavCount),"diff: ",newFavCount-prevFavCount));
 			tuples.append((str(id),str(newFavCount)));
 		counter += 1;
 
-	print(diffs);
-	plt.scatter(list(range(len(diffs))),diffs)
+	for diff in diffs:
+		print(diff);
+	plt.scatter(list(range(len(oldDiffs))),oldDiffs)
 	plt.show()
 
 	toLog = str(input("should I log this tho bro me"))
@@ -259,6 +263,11 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 		tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(ns, tweets,retabulate=True);
 		nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash)
 
+
+
+	# nGramsWithFavsMinusMean = nGramsWithFavsMinusMean[-20:]
+	# nGramsWithFavsMinusMedian = nGramsWithFavsMinusMedian[-20:]
+
 	dataFrameDict = {}
 
 	dataFrameDict["n-grams furthest from mean from ds mean :"] = [nGram[nGramStorageIndicesSkew["nGram"]] + "; count:" + str(nGram[nGramStorageIndicesSkew["count"]]) + "; skew: " + str(nGram[nGramStorageIndicesSkew["skew"]]) for nGram in nGramsWithFavsMinusMean[:40]]
@@ -290,13 +299,34 @@ def favouriteVsLengthTrends():
 	plt.title(pearson)
 	plt.show()
 
+def graphMediaByFavCount():
+	photoTweets = [t[0] for t in getTweetsFromDB(orderBy="favCount asc", purePres=True, returnParams=["favCount"],conditions=["mediaType = \"photo\""])]
+	articleTweets = [t[0] for t in getTweetsFromDB(orderBy="favCount asc", purePres=True, returnParams=["favCount"],conditions=["mediaType = \"articleLink\""])]
+	videoTweets = [t[0] for t in getTweetsFromDB(orderBy="favCount asc", purePres=True, returnParams=["favCount"], conditions=["mediaType like \"video#%\""])]
+	noMediaTweets = [t[0] for t in getTweetsFromDB(orderBy="favCount asc", purePres=True, returnParams=["favCount"], conditions=["mediaType = \"none\""])]
+	interLen = 0;
+	colors = ["r","g","b","y"]
+	plt.scatter([i +interLen for i in range(len(photoTweets))], photoTweets,label="photo tweets",c=colors[0])
+	plt.plot([interLen,interLen+len(photoTweets)],[np.median(photoTweets),np.median(photoTweets)],c=colors[0])
+	interLen += len(photoTweets);
+	plt.scatter([i +interLen for i in range(len(articleTweets))], articleTweets,label="article tweets",c=colors[1])
+	plt.plot([interLen, interLen + len(articleTweets)], [np.median(articleTweets), np.median(articleTweets)],c=colors[1])
+	interLen += len(articleTweets);
+	plt.scatter([i+interLen for i in range(len(videoTweets))], videoTweets,label="video tweets",c=colors[2])
+	plt.plot([interLen, interLen + len(videoTweets)], [np.median(videoTweets), np.median(videoTweets)],c=colors[2])
+	interLen += len(videoTweets);
+	plt.scatter([i +interLen for i in range(len(noMediaTweets))], noMediaTweets,label="no media tweets",c=colors[3])
+	plt.plot([interLen, interLen + len(noMediaTweets)], [np.median(noMediaTweets), np.median(noMediaTweets)],c=colors[3])
+	plt.title("Favourite Counts Based on Media contained in Tweets")
+	plt.legend();
+	plt.show();
 
-
-def favouriteOverTimeTrends():
-	tweets = getTweetsFromDB(orderBy="publishTime asc",purePres=True)
 	bestPearson = -1
 	bestDaysPerMonthCount = -1;
-	for daysPerMonthCount in [int(np.exp2(i)) for i in range(10)]:
+	presidentDate = None;
+	electionDate = None;
+	for daysPerMonthCount in [7]:  # ,2,5,7,14,21,31,62]:#int(np.exp2(i)) for i in range(10)]:
+		plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
 		avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, _ = computeXandYForPlotting(
 			tweets, daysPerMonth=daysPerMonthCount);
 
@@ -307,13 +337,97 @@ def favouriteOverTimeTrends():
 		if pearson > bestPearson:
 			bestPearson = pearson
 			bestDaysPerMonthCount = daysPerMonthCount
-		plt.plot([i for i in range(len(months))], avgFavCounts, label="favCounts")
-		plt.plot([i for i in range(len(months))], [slope * i + intercept for i in range(len(months))], label="ols")
-		plt.title(str(bestDaysPerMonthCount) + " days per month; pearson: " + str(bestPearson))
-		plt.legend()
-		plt.show()
+	# plt.plot([i for i in range(len(months))], avgFavCounts, label="favCounts")
+	# plt.plot([i for i in range(len(months))], [slope * i + intercept for i in range(len(months))], label="ols")
+	# plt.title("fav counts grouped by "+str(bestDaysPerMonthCount)+" days; pearson correlation coefficient: "+str(pearson))
+	# plt.legend()
+	# plt.show()
+
+	for index, month in enumerate(months):
+		if month > datetime.datetime(day=20, month=2, year=2017):
+			presidentDate = index;
+			break;
+	for index, month in enumerate(months):
+		if month > datetime.datetime(day=8, month=1, year=2016):
+			electionDate = index;
+			break;
+	# plt.yscale("log")
+	plt.plot([presidentDate, presidentDate], [0, max(avgFavCounts)], label="Inauguration");
+	plt.plot([electionDate, electionDate], [0, max(avgFavCounts)], label="Election");
 	avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, _ = computeXandYForPlotting(tweets, daysPerMonth=bestDaysPerMonthCount);
 
+	showEveryNthDate = 2;
+	newMonths = months[1:]
+	newMonths[0] = str(newMonths[0])[:10]
+	newDates = months.copy()
+
+	while len(newDates) - newDates.count("") > 15:
+		newDates = [str(date - datetime.timedelta(days=1))[:10] if index % showEveryNthDate == showEveryNthDate - 1 else "" for index, date in enumerate(newMonths[1:])];
+		showEveryNthDate += 1;
+		print("n00b")
+	newMonths[1:] = newDates
+	plt.xticks([i for i in range(len(newMonths))], newMonths);
+	firstPublishTime = tweets[0][1]
+
+	fitLineCoefficients = np.polyfit([i for i in range(len(months))], avgFavCounts, 1, full=False)
+	slope = fitLineCoefficients[0];
+	intercept = fitLineCoefficients[1]
+	plt.plot([i for i in range(len(months))], avgFavCounts, label="favCounts")
+	plt.plot([i for i in range(len(months))], [slope * i + intercept for i in range(len(months))], label="ols")
+	plt.title("fav counts grouped by " + str(bestDaysPerMonthCount) + " days; pearson correlation coefficient: " + str(round(bestPearson, 2)))
+	plt.legend()
+	plt.show()
+
+
+def favouriteOverTimeTrends():
+	tweets = getTweetsFromDB(orderBy="publishTime asc",purePres=False,conditions=["deleted = 0","isRt = 0"])
+	bestPearson = -1
+	bestDaysPerMonthCount = -1;
+	presidentDate = None;
+	electionDate = None;
+	for daysPerMonthCount in [7]:#,2,5,7,14,21,31,62]:#int(np.exp2(i)) for i in range(10)]:
+		plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+		avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, _ = computeXandYForPlotting(
+			tweets, daysPerMonth=daysPerMonthCount);
+
+		fitLineCoefficients = np.polyfit([i for i in range(len(months))], avgFavCounts, 1, full=False)
+		slope = fitLineCoefficients[0];
+		intercept = fitLineCoefficients[1]
+		pearson = pearsonCorrelationCoefficient([slope * i + intercept for i in range(len(months))], avgFavCounts)
+		if pearson > bestPearson:
+			bestPearson = pearson
+			bestDaysPerMonthCount = daysPerMonthCount
+		# plt.plot([i for i in range(len(months))], avgFavCounts, label="favCounts")
+		# plt.plot([i for i in range(len(months))], [slope * i + intercept for i in range(len(months))], label="ols")
+		# plt.title("fav counts grouped by "+str(bestDaysPerMonthCount)+" days; pearson correlation coefficient: "+str(pearson))
+		# plt.legend()
+		# plt.show()
+
+	for index, month in enumerate(months):
+		if month > datetime.datetime(day=20,month=2,year=2017):
+			presidentDate = index;
+			break;
+	for index, month in enumerate(months):
+		if month > datetime.datetime(day=8,month=1,year=2016):
+			electionDate = index;
+			break;
+	# plt.yscale("log")
+	plt.plot([presidentDate,presidentDate],[0,max(avgFavCounts)],label="Inauguration");
+	plt.plot([electionDate, electionDate], [0, max(avgFavCounts)], label="Election");
+	avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, _ = computeXandYForPlotting(tweets, daysPerMonth=bestDaysPerMonthCount);
+
+	showEveryNthDate = 2;
+	newMonths = months[1:]
+	newMonths[0] = str(newMonths[0])[:10]
+	newDates = months.copy()
+
+	while len(newDates) - newDates.count("") > 15:
+		newDates = [str(date-datetime.timedelta(days=1))[:10] if index % showEveryNthDate == showEveryNthDate - 1 else "" for index, date in enumerate(newMonths[1:])];
+		showEveryNthDate += 1;
+		print("n00b")
+	newMonths[1:] = newDates
+	plt.xticks([i for i in range(len(newMonths))], newMonths);
+	firstPublishTime = tweets[0][1]
 
 
 	fitLineCoefficients = np.polyfit([i for i in range(len(months))], avgFavCounts, 1, full=False)
@@ -321,7 +435,7 @@ def favouriteOverTimeTrends():
 	intercept = fitLineCoefficients[1]
 	plt.plot([i for i in range(len(months))],avgFavCounts,label="favCounts")
 	plt.plot([i for i in range(len(months))],[slope*i+intercept for i in range(len(months))],label="ols")
-	plt.title(str(bestDaysPerMonthCount)+" days per month; pearson: "+str(bestPearson))
+	plt.title("fav counts grouped by "+str(bestDaysPerMonthCount)+" days; pearson correlation coefficient: "+str(round(bestPearson,2)))
 	plt.legend()
 	plt.show()
 
@@ -352,8 +466,44 @@ def graphPearsonsForApprFavOffset():
 	maxOffSetDay = ratings[0][0]+datetime.timedelta(days=dateRange[maxOffsetIndex])
 	plt.plot([i for i in dateRange],pearsons);
 	plt.scatter(dateRange[maxOffsetIndex],pearsons[maxOffsetIndex], color = "r", marker="x")
-	plt.title(maxOffSetDay)
+	plt.title("correlation coefficients for approval rating and favCount, offset by variable number of days")
 	plt.show()
+
+def graphFavCount():
+	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
+	plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
+	plt.title("FavCount for all presidential tweets")
+	plt.show();
+
+
+def graphFavCountLogRound():
+
+	favCounts = getTweetsFromDB(purePres=True, returnParams=["favCount", "mediaType", "isReply"], orderBy="favCount asc");
+
+	favCountsPure = [np.log(fc[0]) for fc in favCounts if (fc[1] == "none" and fc[2] == 0)];
+	favCounts = [np.log(fc[0]) for fc in favCounts]
+
+	std = np.std(favCounts);
+	mean = np.mean(favCounts);
+	meanPure = np.mean(favCountsPure);
+	stdPure = np.std(favCountsPure);
+	# favCounts = [c[0] for c in favCounts]
+	# favCounts = [np.log(c[0]) for c in favCounts]
+
+	zScores = [(fc - mean)/std for fc in favCounts]
+	zScoresPure = [(fc - meanPure) / stdPure for fc in favCountsPure]
+	zScoresAboveNeg2 = [z for z in zScores if z>=-2];
+	zScoresAboveNeg2Pure = [z for z in zScoresPure if z >= -2];
+	print("percentage z scores above -2: ",len(zScoresAboveNeg2)/len(zScores))
+	print("percentage pure z scores above -2: ", len(zScoresAboveNeg2Pure) / len(zScoresPure))
+
+	plt.plot([i for i in range(len(favCounts))], favCounts)
+	plt.title("FavCount for all presidential tweets")
+	plt.show();
+
+	plt.plot([i for i in range(len(favCountsPure))], favCountsPure)
+	plt.title("FavCount for all presidential tweets pure")
+	plt.show();
 
 
 def graphFavsByApprRating():
@@ -419,12 +569,17 @@ def graphFavsByApprRating():
 def graphFavsAndRtsByRatio():
 
 
-	daysPerMonth = 10;
-	tweets = getTweetsFromDB(conditions = ["isRt = 0"],returnParams=["tweetText","publishTime", "favCount", "rtCount"],orderBy="publishTime asc")
+	daysPerMonth = 1;
+	tweets = getTweetsFromDB(purePres=True,conditions = ["isRt = 0"],returnParams=["tweetText","publishTime", "favCount", "rtCount"],orderBy="publishTime asc")
 
 	avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, _ = computeXandYForPlotting(tweets, daysPerMonth)
 	favsRtsRatio = [ avgFavCounts[i] / avgRtCounts[i] if avgRtCounts[i] > 0 else 0 for i in range(len(months))]
 
+
+
+	pearson = pearsonCorrelationCoefficient(avgFavCounts,avgRtCounts)
+	graphTwoDataSetsTogether(avgFavCounts, "fav counts", avgRtCounts ,"rt counts",title="rt counts"+ "favourite count and rt count; correlation coefficient: " + str(round(pearson,2)))
+	exit()
 
 
 	fig=plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
@@ -446,10 +601,11 @@ def graphFavsAndRtsByRatio():
 
 	pFavs, = host.plot(xes, avgFavCounts, color=color1, label="favCount")
 	pRts, = host.plot(xes, avgRtCounts, color=color2, label="rtCount")
-	pRatio, = par1.plot(xes, favsRtsRatio, color=color3, label="ratiooo")
+	# pRatio, = par1.plot(xes, favsRtsRatio, color=color3, label="ratiooo")
 
 
-	lns = [pFavs,pRts,pRatio]
+	# lns = [pFavs,pRts,pRatio]
+	lns = [pFavs, pRts]
 	host.legend(handles=lns, loc='best')
 
 	# right, left, top, bottom
@@ -460,5 +616,6 @@ def graphFavsAndRtsByRatio():
 
 
 	# host.yaxis.label.set_color(pFavs.get_color())
-	par1.yaxis.label.set_color(pRatio.get_color())
+	# par1.yaxis.label.set_color(pRatio.get_color())
+	# plt.title();
 	plt.show()

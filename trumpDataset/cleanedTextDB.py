@@ -41,7 +41,8 @@ def populateCleanedTextColumnThreadTarget(threadNumber, tweets,tuplesDict):
 def populateCleanedTextColumn():
 	updateFormula = "UPDATE "+mainTable+" SET cleanedText = %s WHERE id = %s";
 
-	tweets=getTweetsFromDB(n=-1, conditions=["cleanedText is null"], returnParams=["id","tweetText"])
+	tweets=getTweetsFromDB(n=-1, returnParams=["id","tweetText"])
+	# tweets = getTweetsFromDB(n=-1, conditions=["cleanedText is null"], returnParams=["id", "tweetText"])
 	print("we've got ",len(tweets)," tweets to update!")
 	numThreads = 100;
 	tuples = [];

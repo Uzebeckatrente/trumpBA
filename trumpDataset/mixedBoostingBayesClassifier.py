@@ -1,13 +1,128 @@
 from .stats import ols
 from .favs import getMedianFavCountPresTweets, getMeanFavCountPresTweets, \
 	calculateAndStorenGramsWithFavsMinusMeanMedian, loadnGramsWithFavsMinusMeanMedian
-from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences
+from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences, computeMostCommonnGrams
 from .media import removeMediaFromTweet
 from .basisFuncs import *
 from .deletedAndAllCaps import getAllCapsSkewForAboveThreshold;
 
-# from keras import Sequential
-# from keras.layers import Dense
+from keras import Sequential
+# from keras import initializers;
+from keras.layers import Dense
+
+
+class MLPPopularity():
+
+	def createDataAndTargetMatrices(self, tweets):
+		favs = [t[0] for t in tweets];
+		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)));
+		targetMatrix = np.ndarray((len(tweets), 1))
+
+		for tweetIndex, tweet in enumerate(tweets):
+			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
+			for nGram in nGramsForTweet:
+				if nGram in self.nGramIndices:
+					nGramIndex = self.nGramIndices[nGram]
+					bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
+
+				# if zScore(favs,tweet[0]) > 1:
+				if tweet[0]> self.ninetiethPercentileFavCount:
+					targetMatrix[tweetIndex] = 1
+				else:
+					targetMatrix[tweetIndex] = 0;
+
+		return bigMatrix,targetMatrix
+	def train(self,trainingTweets):
+		trainingTweets.sort(key=lambda tuple: tuple[0], reverse=False)
+		self.ninetiethPercentileFavCount = trainingTweets[int(len(trainingTweets)*0.9)][0];
+
+		self.trainingTweets = trainingTweets;
+
+		self.median = getMedianFavCountPresTweets(trainingTweets)
+
+
+
+		allNGrams = set();
+		self.nGramIndices = {}
+		allNGramsWithCountsDict = {}
+		self.ns = [1,2,3,4]#,3,4]
+		for n in self.ns:
+			computeMostCommonnGrams([tweet[0:2] for tweet in trainingTweets], n);
+			myNGramsWithCounts = getnGramsWithOverMOccurences(n, 2, hashTweets([tweet[0:2] for tweet in trainingTweets]))
+			myNGramsWithCountsDict = {nGram[0]:nGram[1] for nGram in myNGramsWithCounts}
+			myNGrams = [nGram[0] for nGram in myNGramsWithCounts]
+			allNGrams.update(myNGrams)
+			allNGramsWithCountsDict.update(myNGramsWithCountsDict)
+
+		# for tweet in self.trainingTweets:
+		# 	cleanedText = tweet[1]
+		# 	nGrams = extractNGramsFromCleanedText(cleanedText,ns)
+		# 	allNGrams.update(nGrams);
+		counter = 0;
+		for nGram in allNGrams:
+			self.nGramIndices[nGram] = counter
+			counter += 1;
+
+		self.allNGrams = allNGrams;
+		self.allNGramsWithCountsDict = allNGramsWithCountsDict;
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets)
+		print("dims: ", bigMatrix.shape);
+		startTime = time.time()
+
+		model = Sequential()
+		# model.add(Dense(12, input_dim=inputDim, activation='relu'))
+		model.add(Dense(12, input_dim=bigMatrix.shape[1], activation='relu',use_bias=True))
+		model.add(Dense(1, activation='sigmoid',use_bias=True))
+		model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+		model.fit(bigMatrix, targetMatrix, epochs=50, batch_size=int(bigMatrix.shape[0]/5))
+
+		B_Input_Hidden = model.layers[0].get_weights()[1]
+		B_Output_Hidden = model.layers[1].get_weights()[1]
+
+		self.model = model;
+
+		print("trained in : ",time.time()-startTime)
+
+		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
+
+
+	def test(self,testTweets):
+
+
+		testTweets.sort(key=lambda tup: tup[0]);
+
+		numCorrect = 0;
+
+		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
+		print("predicting dims: ", predictionMatrix.shape);
+
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets);
+		actualFavs = [t[0] for t in testTweets];
+		# predictionMatrix = np.array([-123]*predictionMatrix.shape[0]);
+		predictions = self.model.predict_classes(predictionMatrix)
+		for i in range(predictions.shape[0]):
+			prediction = predictions[i][0];
+			target = targetMatrix[i][0]
+			prod = prediction*target;
+			if prediction == 0 and target == 0 or prediction > 0 and target > 0:
+				numCorrect += 1;
+
+
+
+		xes = [i for i in range(len(testTweets))];
+		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		fig.subplots_adjust(left=0.06, right=0.94)
+		fig.suptitle('Predicted FavCounts and real FavCounts (log)')
+		plt.plot(xes, targetMatrix, 'g', label='Actual Counts')
+		plt.plot(xes, predictions, 'r', label='Predicted Counts')
+		plt.legend()
+		plt.show()
+
+		print(numCorrect/len(testTweets))
+
+
+
+
 
 def trainFavoriteCountGuesser():
 	'''
@@ -161,7 +276,7 @@ class MixedBoostingBayesClassifier():
 		self.furthestDeviationWords = furthestDeviationWords;
 		self.meaningfulClassifiersFromTopBottomPercentages = meaningfulClassifiersFromTopBottomPercentages;
 		self.filterOutliers = filterOutliers;
-		self.learningRate = 0.05;
+		self.learningRate = 0.0005;
 		self.allCapsThreshhold = 0.7;
 
 	def plotMedianDistribution(self):
@@ -196,7 +311,8 @@ class MixedBoostingBayesClassifier():
 
 		for nGram in self.nGramsWithFavsMinusMedian:
 			self.nGramsWithFavsMinusMedianDict[nGram[0]] = nGram
-			self.nGramMedianWeights[nGram[0]] =10000/(nGram[nGramStorageIndicesSkew["std"]]);# nGram[nGramStorageIndices["skew"]]/self.avgMedianSkew;
+			self.nGramMedianWeights[nGram[0]] =10000/(nGram[nGramStorageIndicesSkew["count"]]*(nGram[nGramStorageIndicesSkew["std"]]));# nGram[nGramStorageIndices["skew"]]/self.avgMedianSkew;
+			# self.nGramMedianWeights[nGram[0]] = 1;
 		self.nGramMedianWeights["allCaps"] = 1;
 
 
@@ -282,7 +398,7 @@ class MixedBoostingBayesClassifier():
 			batch.append(sourceTweets[i])
 		return batch;
 
-	def train(self, trainingTweets,testData = None, epochs = 1,retabulate = False):
+	def train(self, trainingTweets,testData = None, epochs = 40,retabulate = False):
 		'''
 		:param trainingTweets: [(favCount, cleanedText, allCapsRatio),...]
 		:return:
@@ -312,8 +428,9 @@ class MixedBoostingBayesClassifier():
 				realFavCount = tweet[0]
 				cleanedText = tweet[1]
 				allCapsRatio = tweet[2]
+				mediaType = tweet[3]
 				if len(tweet[1])> 2:
-					meanScore, medianScore, numGramsUsed = self.predict(cleanedText, allCapsRatio,training=True)
+					meanScore, medianScore, numGramsUsed = self.predict(cleanedText, allCapsRatio,mediaType,training=True)
 
 					meanSuccess = int(meanScore * (realFavCount - self.meanFavCount) > 0)
 					medianSuccess = int(medianScore * (realFavCount - self.medianFavCount) > 0)
@@ -329,14 +446,35 @@ class MixedBoostingBayesClassifier():
 			if e == 0:
 
 				self.meanBias = np.mean(meanScores)
-				self.medianBias = np.mean(medianScores)
+				self.medianBias = np.median(medianScores)
 			self.learningRate *= 0.99
+			self.updateWeights(updateTuples)
 			wouldBeBias = np.mean(medianScores);
 
 
+
+			'''
+			take 2 :)
+			'''
+			totalSuccessesTake2 = 0;
+			totalGuessesTake2 = 0;
+			for tweet in batch:
+				realFavCount = tweet[0]
+				cleanedText = tweet[1]
+				allCapsRatio = tweet[2]
+				mediaType = tweet[3]
+				if len(tweet[1])> 2:
+					_, medianScore, _ = self.predict(cleanedText, allCapsRatio,mediaType,training=True)
+
+					medianSuccess = int(medianScore * (realFavCount - self.medianFavCount) > 0)
+					if medianSuccess: totalSuccessesTake2 += 1;
+					totalGuessesTake2 += 1;
+
+
+
+
 			print("epoch ",e," finished; training accuracy: ",totalSuccesses/totalGuesses,"training inaccuracy: ",totalFailures/totalGuesses," median score: ", wouldBeBias,"; updating for: ",len(updateTuples)," tweets")
-			if False:
-				self.updateWeights(updateTuples)
+			print("second time around, ",totalSuccessesTake2/totalGuessesTake2)
 
 			# self.test(testData,title="epoch: "+str(e));
 	def updateWeights(self, updateTuples):#supposedToClass, cleanedText, allCapsRatio, ):
@@ -348,65 +486,76 @@ class MixedBoostingBayesClassifier():
 		:return:
 		'''
 
-
+		# print("updating dos weights")
 
 		updateDirections = {}
-
-
+		prevWeights = self.nGramMedianWeights.copy()
+		shouldaBeenPositive = 0;
 		for tuple in updateTuples:
 			supposedToClass = tuple[0]
 			cleanedText = tuple[1]
 			allCapsRatio = tuple[2]
 			nGrams = extractNGramsFromCleanedText(cleanedText, self.ns);
-
+			shouldaBeenPositive += int(supposedToClass == 1);
 
 			for nGram in nGrams:
 
 				if nGram in self.nGramMedianWeights:
-					if supposedToClass == 1:
-						try:
-							updateDirections[nGram].append(1)
-						except:
-							updateDirections[nGram] = [1];
-					else:
-						try:
-							updateDirections[nGram].append(-1);
-						except:
-							updateDirections[nGram]=[-1];
 
-			if allCapsRatio > self.allCapsThreshhold:
-				if supposedToClass == 1:
-					try:
-						updateDirections["allCaps"].append(1)
-					except:
-						updateDirections["allCaps"] = [1];
-				else:
-					try:
-						updateDirections["allCaps"].append(-1);
-					except:
-						updateDirections["allCaps"] = [-1];
+					self.nGramMedianWeights[nGram] += supposedToClass*self.learningRate;
 
-		for nGram in updateDirections.keys():
-			updateDirections[nGram] = (np.std(updateDirections[nGram]),np.mean(updateDirections[nGram]));
-
-		sortedUpdateDirections = {k: v for k, v in sorted(updateDirections.items(), key=lambda item: item[1][0])}
-		# sortedUpdateDirections=sortedUpdateDirections[:int(len(sortedUpdateDirections) * 0.2)]
+		diffs = []
+		for nGram in self.nGramMedianWeights:
+			diffs.append((nGram,np.fabs(self.nGramMedianWeights[nGram]-prevWeights[nGram])))
+		diffs.sort(key=lambda tup: tup[1],reverse=True);
+		print("biggest shakers: ",diffs[:10]);
 
 
-		nGramCounter = 0;
-		numPos = 0;
-		numTotal = 0;
-		for nGram in sortedUpdateDirections.keys():
-			if nGramCounter >= len(sortedUpdateDirections)*0.2:
-				break;
-			if sortedUpdateDirections[nGram][1] > 0:
-				numPos += 1
-				self.nGramMedianWeights[nGram] += self.learningRate
-			else:
-				self.nGramMedianWeights[nGram] -= self.learningRate
-			numTotal += 1;
+		print("pointing pos: ",shouldaBeenPositive/len(updateTuples),self.nGramMedianWeights["great"])
+					# 	try:
+					# 		updateDirections[nGram].append(1)
+					# 	except:
+					# 		updateDirections[nGram] = [1];
+					# else:
+					# 	try:
+					# 		updateDirections[nGram].append(-1);
+					# 	except:
+					# 		updateDirections[nGram]=[-1];
 
-		print("numPos/numTotal: ",numPos/numTotal);
+		# 	if allCapsRatio > self.allCapsThreshhold:
+		# 		self.
+		# 		if supposedToClass == 1:
+		# 			try:
+		# 				updateDirections["allCaps"].append(1)
+		# 			except:
+		# 				updateDirections["allCaps"] = [1];
+		# 		else:
+		# 			try:
+		# 				updateDirections["allCaps"].append(-1);
+		# 			except:
+		# 				updateDirections["allCaps"] = [-1];
+		#
+		# for nGram in updateDirections.keys():
+		# 	updateDirections[nGram] = (np.std(updateDirections[nGram]),np.mean(updateDirections[nGram]));
+		#
+		# sortedUpdateDirections = {k: v for k, v in sorted(updateDirections.items(), key=lambda item: item[1][0])}
+		# # sortedUpdateDirections=sortedUpdateDirections[:int(len(sortedUpdateDirections) * 0.2)]
+		#
+		#
+		# nGramCounter = 0;
+		# numPos = 0;
+		# numTotal = 0;
+		# for nGram in sortedUpdateDirections.keys():
+		# 	if nGramCounter >= len(sortedUpdateDirections)*0.2:
+		# 		break;
+		# 	if sortedUpdateDirections[nGram][1] > 0:
+		# 		numPos += 1
+		# 		self.nGramMedianWeights[nGram] += self.learningRate
+		# 	else:
+		# 		self.nGramMedianWeights[nGram] -= self.learningRate
+		# 	numTotal += 1;
+
+		# print("numPos/numTotal: ",numPos/numTotal);
 	def test(self, testTweets,title=""):
 
 		print("training and the final predict weight: ",self.nGramMedianWeights["allCaps"]);
@@ -447,9 +596,10 @@ class MixedBoostingBayesClassifier():
 			realFavCount = tweet[0]
 			cleanedText = tweet[1]
 			allCapsRatio = tweet[2]
+			mediaType = tweet[3]
 
 			if len(cleanedText) > 2:
-				meanScore, medianScore, numberOfAcceptedGrams = self.predict(cleanedText,allCapsRatio)
+				meanScore, medianScore, numberOfAcceptedGrams = self.predict(cleanedText,allCapsRatio, mediaType)
 
 				if numberOfAcceptedGrams == 0:
 					continue;
@@ -536,20 +686,21 @@ class MixedBoostingBayesClassifier():
 		return meanScore, medianScore, numberOfAcceptedGrams
 
 
-	def predictAllCaps(self,allCapsRatio,countWeight = False, stdWeight = False, boolean = False):
+	def predictAllCaps(self,allCapsRatio, mediaType,countWeight = False, stdWeight = False, boolean = False):
 
 
-		if allCapsRatio > self.allCapsThreshhold:
+		if allCapsRatio > self.allCapsThreshhold and mediaType == "none":
 			return 1;
 		return -1;
 
 
-	def predict(self,cleanedText,allCapsRatio, training = False,countWeight = False, stdWeight = False, boolean = False):
+	def predict(self,cleanedText,allCapsRatio, mediaType, training = False,countWeight = False, stdWeight = False, boolean = False):
 
 
 		meanScore, medianScore, numberOfAcceptedGrams = self.predictNgrams(cleanedText);
-		allCapsBoost = self.predictAllCaps(allCapsRatio);
+		allCapsBoost = self.predictAllCaps(allCapsRatio, mediaType);
 		if allCapsBoost > 0:
+			# return meanScore,medianScore+self.nGramMedianWeights["allCaps"],numberOfAcceptedGrams;
 			return meanScore,medianScore+self.nGramMedianWeights["allCaps"],numberOfAcceptedGrams;
 		else:
 			return meanScore,medianScore,numberOfAcceptedGrams;
@@ -580,3 +731,7 @@ class MixedBoostingBayesClassifier():
 
 		self.m,self.c = ols(xMatrix,yMatrix)
 
+
+'''
+10 or 15 minutes
+'''

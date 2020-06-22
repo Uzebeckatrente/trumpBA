@@ -1,6 +1,6 @@
 ##source for approval ratings: https://github.com/fivethirtyeight/data/tree/master/trump-approval-ratings
 
-from trumpDataset.processTweetData import *
+from .processTweetData import *
 
 def sourceApprovalRatings():
 	f = open("/Users/f002nb9/Downloads/approval_topline.csv");

@@ -95,7 +95,7 @@ def analyzeAllCapsPercentage():
 	overallMean = getMeanFavCountPresTweets(tweets)
 	pearsons = []
 
-	for numSlices in range(1,8):
+	for numSlices in [5]:
 		meanFavCountsByAllCapsRatioInterval = []
 		medianFavCountsByAllCapsRatioInterval = []
 		labels = []
@@ -128,7 +128,7 @@ def analyzeAllCapsPercentage():
 		pearsonMedian = pearsonCorrelationCoefficient(x, medianFavCountsByAllCapsRatioInterval)
 		pearsons.append((pearsonMean,pearsonMedian));
 		plt.legend()
-		plt.title("pearson mean: "+str(pearsonMean)+"; pearson median: "+str(pearsonMedian))
+		plt.title("correlation with mean: "+str(round(pearsonMean,2))+"; correlation with median: "+str(round(pearsonMedian,2)))
 		plt.show()
 	for p in pearsons:
 		print(p);

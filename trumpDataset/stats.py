@@ -12,6 +12,12 @@ def pearsonCorrelationCoefficient(vec1, vec2):
 	std2 = np.std(vec2);
 	return cov/(std1*std2)
 
+def zScore(favs, fav):
+	mean = np.mean(favs);
+	std = np.std(favs);
+	z = (fav-mean)/std;
+	return z;
+
 
 def ols(x, y):
 	vec1WithConstant = np.ones(x.shape[0], 2);

@@ -7,6 +7,8 @@ except:
 	from trumpBA.trumpDataset import *;
 # import trumpBA.trumpDataset
 import time
+
+# graphFavCountLogRound()
 # tweet = getTweetById(1194648339071016961)
 # print(tweet)
 # insertIntoDB(processTrumpTwitterArchiveFile());
@@ -22,6 +24,22 @@ import time
 # graphFavsByApprRating()
 # analyzeSkewOfKeywords(False)
 # updateFavCounts()
+# graphFavsAndRtsByRatio()
+# graphPearsonsForApprFavOffset()
+# favouriteOverTimeTrends()
+# analyzeTopAndBottomPercentiles()
+# graphFavCount();
+# graphFollowerCountByFavCount()
+# exit()
+# compareVocabOverTime(18)
+# visualizeFavCountDistributionForKeyword("great",True);
+# analyzeAllCapsPercentage();
+# analyzeOverUnderMeanSkewOfKeywords();
+# graphMediaByFavCount();
+# favouriteOverTimeTrends()
+# tweetCountOverTime()
+#
+# exit()
 # favouriteOverTimeTrends()
 # exit()
 # populateAllCapsPercentageColumn()
@@ -43,21 +61,33 @@ import time
 # favouriteVsLengthTrends()
 # favouriteOverTimeTrends()
 # graphPearsonsForApprFavOffset()
+# populateCleanedTextColumn()
 
-analyzeTopAndBottomPercentiles()
-for epochCount in range(3,101,3):
-	compareVocabOverTime(epochCount)
-# compareVocabOverTime(5)
-exit()
+#
+# analyzeTopAndBottomPercentiles()
+# compareVocabOverTime(18)
+# for epochCount in range(3,101,3):
+# 	compareVocabOverTime(epochCount)
+# # compareVocabOverTime(5)
+# exit()
 
 
 np.random.seed(69)
-allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio"], orderBy= "publishTime desc")
+allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType"], orderBy= "publishTime desc")
 
 indices = np.random.permutation(len(allPresTweetsFavCountAndCleanedText))
+numFolds = 5;
+foldsIndices = [indices[int(len(allPresTweetsFavCountAndCleanedText)*(0.2*i)):int(len(allPresTweetsFavCountAndCleanedText)*(0.2*i+1))] for i in range(numFolds)]
 training_idx, test_idx = indices[:int(len(allPresTweetsFavCountAndCleanedText)*0.8)], indices[int(len(allPresTweetsFavCountAndCleanedText)*0.8):]
 training = []
 test = []
+folds = []
+for indices in foldsIndices:
+	fold = []
+	for i in indices:
+		fold.append(allPresTweetsFavCountAndCleanedText[i]);
+	folds.append(fold);
+
 for i in range(len(allPresTweetsFavCountAndCleanedText)):
 	if len(allPresTweetsFavCountAndCleanedText[i][1])>0:
 		if i in training_idx:
@@ -67,23 +97,32 @@ for i in range(len(allPresTweetsFavCountAndCleanedText)):
 print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," test tweets",Style.RESET_ALL);
 
 allCapsClassifier = AllCapsClassifier()
+mlpClassifier = MLPPopularity();
+poissonClassifier = LogRegressionSlashPoisson();
+olsClassifier = OlsTry()
+mlpClassifier.train(training)
+# poissonClassifier.train(training,reload=False)
+mlpClassifier.test(training);
+mlpClassifier.test(test);
+exit()
 
-allCapsClassifier.train(training);
+
 # allCapsClassifier.test(test,title="test data");
-allCapsClassifier.test(training,training=False,title="train data")[0];
-misClassifiedsAllCaps =allCapsClassifier.test(test,training=False,title="tist data")[0];
-misClassifiedsAllCaps.sort(key=lambda tup: tup[0]);
 #
-naiveBayesClassifier = PureBayesClassifier()
-naiveBayesClassifier.train(training,testData = test,retabulate = False)
-naiveBayesClassifier.predict("peaceofficersmemorialday")
-print(Fore.CYAN,"test error: ")
-misClassifiedNaive = naiveBayesClassifier.test(test, title="naive bayes baybayy")
-print(Fore.LIGHTRED_EX,"train error: ")
-naiveBayesClassifier.test(training, title="training naive")
+# allCapsClassifier.train(training);
+# misClassifiedsAllCaps =allCapsClassifier.test(test,training=False,title="tist data")[0];
+# misClassifiedsAllCaps.sort(key=lambda tup: tup[0]);
+# #
+# naiveBayesClassifier = PureBayesClassifier()
+# naiveBayesClassifier.train(training,testData = test,retabulate = False)
+# naiveBayesClassifier.predict("peaceofficersmemorialday")
+# print(Fore.CYAN,"test error: ")
+# misClassifiedNaive = naiveBayesClassifier.test(test, title="naive bayes baybayy")
+# print(Fore.LIGHTRED_EX,"train error: ")
+# naiveBayesClassifier.test(training, title="training naive")
+# #
 #
-
-
+#
 
 
 booster = MixedBoostingBayesClassifier()

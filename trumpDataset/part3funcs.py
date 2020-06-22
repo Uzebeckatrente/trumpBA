@@ -14,6 +14,7 @@ stop_words = nltk.corpus.stopwords.words('english')
 
 
 
+
 ###makes sense for tweets
 stop_words.append("rt")
 ###
@@ -273,8 +274,7 @@ def normalize_document(doc):
 
 def unworthynessOfToken(token):
 
-
-	return token.is_stop or token.is_punct or token.is_space or numberButNotYear(token) or len(token.string)<2;
+	return token.is_stop or token.lemma_ in stop_words or token.is_punct or token.is_space or numberButNotYear(token) or len(token.string)<2;
 
 
 #function for making pre-processing/verschoening each document

@@ -98,3 +98,5 @@ def getPresidentTweetsWithMedia(expecting = False, mediaType = False , limit = 1
 		mycursor.execute("SELECT tweetText, id FROM "+mainTable+" where tweetText like \"%https://%\"")
 	tweetsWithMedia = mycursor.fetchall()
 	return tweetsWithMedia
+
+

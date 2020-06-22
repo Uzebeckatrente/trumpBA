@@ -1,11 +1,15 @@
 from .stats import ols
 from .favs import getMedianFavCountPresTweets, getMeanFavCountPresTweets, \
 	calculateAndStorenGramsFavsProbabilities, loadnGramsWithFavsProbabilities
-from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences
+from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences, computeMostCommonnGrams
 from .media import removeMediaFromTweet
 from .basisFuncs import *
+from .stats import zScore;
 from .visualization import graphTwoDataSetsTogether;
 from .deletedAndAllCaps import getAllCapsSkewForAboveThreshold;
+import statsmodels.api as sm
+from sklearn.kernel_ridge import KernelRidge
+
 
 # from keras import Sequential
 # from keras.layers import Dense
@@ -75,14 +79,40 @@ class AllCapsClassifier():
 			batch.append(sourceTweets[i])
 		return batch;
 
-	def train(self, trainingTweets,testData = None, epochs = 50,retabulate = False):
+	def crossValidate(self, folds):
+		numFolds = len(folds);
+		possibleThreshholds = np.array(list(range(50))) / 67.5 + 0.26
+		totalGuess = [];
+		testSuccessRates = []
+		for t in possibleThreshholds:
+			sumSuccessRate = 0;
+			for holdOut in range(numFolds):
+				flatList = []
+				for fold in folds[0:holdOut] + folds[holdOut + 1:numFolds]:
+					flatList.extend(fold);
+				self.train(flatList, trainingThreshhold=t);
+				self.test(folds[holdOut], training=True, title="train data")[0];
+				sumSuccessRate += self.successRate;
+			totalSuccess = sumSuccessRate / len(folds);
+			totalGuess.append(self.totalGuesses);
+			testSuccessRates.append(totalSuccess);
+			print("success for ", t, " ", totalSuccess, self.totalGuesses)
+
+
+		argMaxSuccessRate = np.argmax(testSuccessRates)
+		print("best success: ", possibleThreshholds[argMaxSuccessRate], " at clip: ", testSuccessRates[argMaxSuccessRate], "with ", totalGuess[argMaxSuccessRate], " guesses");
+
+	def train(self, trainingTweets,trainingThreshhold = -1,testData = None, epochs = 50,retabulate = False):
 		'''
 		:param trainingTweets: [(favCount, cleanedText, allCapsRatio),...]
 		:return:
 		'''
+
 		self.trainingTweets = trainingTweets
 		self.medianFavCount = getMedianFavCountPresTweets(self.trainingTweets)
 		self.tweetsHash = hashTweets(trainingTweets)
+		self.allCapsLowerThreshhold = 0.4525925925925926
+		return;
 
 
 		self.trainingTweets.sort(key = lambda tup: tup[2])
@@ -90,7 +120,10 @@ class AllCapsClassifier():
 		#
 		# exit()
 
-		possibleThreshholds =np.array(list(range(50)))/67.5+0.26
+		if trainingThreshhold != -1:
+			possibleThreshholds = [trainingThreshhold]
+		else:
+			possibleThreshholds =np.array(list(range(50)))/67.5+0.26
 
 		successRates = []
 		totalGuesses = []
@@ -102,10 +135,10 @@ class AllCapsClassifier():
 				totalGuesses.append(self.totalGuesses)
 
 		maxSuccessRateIndex = np.argmax(successRates);
-		print("max success rate: ",successRates[maxSuccessRateIndex]," at threshhold: ",possibleThreshholds[maxSuccessRateIndex])
+		# print("max success rate: ",successRates[maxSuccessRateIndex]," at threshhold: ",possibleThreshholds[maxSuccessRateIndex])
 		self.allCapsLowerThreshhold = possibleThreshholds[maxSuccessRateIndex]
 
-		# graphTwoDataSetsTogether(successRates,"successRates",totalGuesses,"totalGuesses");
+		# graphTwoDataSetsTogether(successRates,"successRates",totalGuesses,"totalGuesses",xes = possibleThreshholds);
 
 
 
@@ -134,12 +167,12 @@ class AllCapsClassifier():
 			realFavCount = tweet[0]
 
 			allCapsRatio = tweet[2]
+			mediaType = tweet[3]
 
 
-			prediction= self.predict(allCapsRatio, self.allCapsLowerThreshhold)
+			prediction= self.predict(allCapsRatio, self.allCapsLowerThreshhold, mediaType)
 			if prediction == 0:
 				continue;
-			print("tweet: ", tweet[1],prediction);
 
 			success = int(prediction * (realFavCount - self.medianFavCount) > 0)
 			totalCorrect += success;
@@ -165,7 +198,7 @@ class AllCapsClassifier():
 			self.displayPredictionResults(title=title)
 		return [misClassifiedTweetsNaive]
 
-	def predict(self, allCapsRatio, lowerThreshhold):
+	def predict(self, allCapsRatio, lowerThreshhold, mediaType):
 		'''
 		Predicting: P(C_i | cleanedText) = P(C_b)*\product p(nGram_i | C_b)
 		:param cleanedText:
@@ -175,10 +208,312 @@ class AllCapsClassifier():
 		:return:
 		'''
 
-		if lowerThreshhold <= allCapsRatio :
+		if lowerThreshhold <= allCapsRatio and mediaType == "none":
 			return 1;
 		else:
 			return 0;
+
+
+
+
+
+class OlsTry():
+
+	'''
+	todo: how to tell OLS to focus on parameters which have a lower std?
+	'''
+
+	def createDataAndTargetMatrices(self, tweets):
+		favs = [t[0] for t in tweets];
+		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)));
+		targetMatrix = np.ndarray((len(tweets), 1))
+
+		for tweetIndex, tweet in enumerate(tweets):
+			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
+			for nGram in nGramsForTweet:
+				if nGram in self.nGramIndices:
+					nGramIndex = self.nGramIndices[nGram]
+					bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
+
+				# if zScore(favs,tweet[0]) > 1:
+				if tweet[0]> self.ninetiethPercentileFavCount:
+					targetMatrix[tweetIndex] = 10
+				else:
+					targetMatrix[tweetIndex] = -10;
+
+		return bigMatrix,targetMatrix
+	def train(self,trainingTweets):
+		trainingTweets.sort(key=lambda tuple: tuple[0], reverse=False)
+		self.ninetiethPercentileFavCount = trainingTweets[int(len(trainingTweets)*0.9)][0];
+
+		self.trainingTweets = trainingTweets;
+
+		self.median = getMedianFavCountPresTweets(trainingTweets)
+
+
+
+		allNGrams = set();
+		self.nGramIndices = {}
+		allNGramsWithCountsDict = {}
+		self.ns = [1,2,3,4]#,3,4]
+		for n in self.ns:
+			computeMostCommonnGrams([tweet[0:2] for tweet in trainingTweets], n);
+			myNGramsWithCounts = getnGramsWithOverMOccurences(n, 2, hashTweets([tweet[0:2] for tweet in trainingTweets]))
+			myNGramsWithCountsDict = {nGram[0]:nGram[1] for nGram in myNGramsWithCounts}
+			myNGrams = [nGram[0] for nGram in myNGramsWithCounts]
+			allNGrams.update(myNGrams)
+			allNGramsWithCountsDict.update(myNGramsWithCountsDict)
+
+		# for tweet in self.trainingTweets:
+		# 	cleanedText = tweet[1]
+		# 	nGrams = extractNGramsFromCleanedText(cleanedText,ns)
+		# 	allNGrams.update(nGrams);
+		counter = 0;
+		for nGram in allNGrams:
+			self.nGramIndices[nGram] = counter
+			counter += 1;
+
+		self.allNGrams = allNGrams;
+		self.allNGramsWithCountsDict = allNGramsWithCountsDict;
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets)
+		print("dims: ", bigMatrix.shape);
+		startTime = time.time()
+		clf = KernelRidge(alpha=1.0, kernel='linear')
+		clf.fit(bigMatrix, targetMatrix)
+		self.clf = clf;
+		if False:
+			self.weights = np.linalg.lstsq(bigMatrix, targetMatrix)[0];
+		print("trained in : ",time.time()-startTime)
+
+		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
+
+
+	def test(self,testTweets):
+
+		testTweets.sort(key=lambda tup: tup[0]);
+
+		numCorrect = 0;
+
+		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
+		print("predicting dims: ", predictionMatrix.shape);
+
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets);
+		actualFavs = [t[0] for t in testTweets];
+
+		predictions =self.clf.predict(predictionMatrix);
+		for i in range(predictions.shape[0]):
+			if predictions[i]*targetMatrix[i] > 0:
+				numCorrect += 1;
+
+
+		xes = [i for i in range(len(testTweets))];
+		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		fig.subplots_adjust(left=0.06, right=0.94)
+		fig.suptitle('Predicted FavCounts and real FavCounts (log)')
+		plt.plot(xes, targetMatrix, 'go-', label='Actual Counts')
+		plt.plot(xes, predictions, 'ro-', label='Predicted Counts')
+		plt.legend()
+		plt.show()
+
+		print(numCorrect/len(testTweets))
+
+
+
+class LogRegressionSlashPoisson():
+
+	'''
+	todo: how to tell OLS to focus on parameters which have a lower std?
+	'''
+
+	def createDataAndTargetMatrices(self, tweets):
+		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)));
+		targetMatrix = np.ndarray((len(tweets), 1))
+
+		for tweetIndex, tweet in enumerate(tweets):
+			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
+			for nGram in nGramsForTweet:
+				if nGram in self.nGramIndices:
+					nGramIndex = self.nGramIndices[nGram]
+					bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
+
+
+				targetMatrix[tweetIndex] = np.log(tweet[0]);
+				# if tweet[0] - self.median > 0:
+				# 	targetMatrix[tweetIndex] = 1
+				# else:
+				# 	targetMatrix[tweetIndex] = -1;
+
+		return bigMatrix,targetMatrix
+
+
+	def trainPoisson(self, trainingTweets, reload = False):
+
+
+		self.trainingTweets = trainingTweets;
+		hash = hashTweets(trainingTweets);
+		self.ns = [1, 2]
+		if not reload:
+			try:
+				fileName = "trumpBA/trumpDataset/classifiers/poisson" + str(self.ns) + hash + ".p";
+				classifile = open(fileName, "rb")
+				self.poisson_training_results = pickle.load(classifile);
+
+				fileNameAllNGrams = "trumpBA/trumpDataset/classifiers/allNGrams" + str(self.ns) + hash + ".p";
+				allNGramsFile = open(fileNameAllNGrams, "rb")
+				self.allNGrams = pickle.load(allNGramsFile);
+				return;
+			except:
+				print("reloading anyways :)")
+
+		self.median = getMedianFavCountPresTweets(trainingTweets)
+
+		allNGrams = set();
+		self.nGramIndices = {}
+		allNGramsWithCountsDict = {}
+		#  # ,3,4]
+		for n in self.ns:
+			computeMostCommonnGrams([tweet[0:2] for tweet in trainingTweets], n);
+			myNGramsWithCounts = getnGramsWithOverMOccurences(n, 25, hashTweets([tweet[0:2] for tweet in trainingTweets]))
+			myNGramsWithCountsDict = {nGram[0]: nGram[1] for nGram in myNGramsWithCounts}
+			myNGrams = [nGram[0] for nGram in myNGramsWithCounts]
+			allNGrams.update(myNGrams)
+			allNGramsWithCountsDict.update(myNGramsWithCountsDict)
+
+		# for tweet in self.trainingTweets:
+		# 	cleanedText = tweet[1]
+		# 	nGrams = extractNGramsFromCleanedText(cleanedText,ns)
+		# 	allNGrams.update(nGrams);
+		counter = 0;
+		for nGram in allNGrams:
+			self.nGramIndices[nGram] = counter
+			counter += 1;
+
+		self.allNGrams = allNGrams;
+		self.allNGramsWithCountsDict = allNGramsWithCountsDict;
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets)
+		print("calculatin",bigMatrix.shape)
+		self.poisson_training_results = sm.GLM(targetMatrix,bigMatrix, family=sm.families.Poisson()).fit()
+
+		with open("trumpBA/trumpDataset/classifiers/poisson" + str(self.ns) + hash + ".p",'wb') as classifile:
+			pickle.dump(self.poisson_training_results, classifile)
+			classifile.close()
+		with open("trumpBA/trumpDataset/classifiers/allNGrams" + str(self.ns) + hash + ".p",'wb') as nGramFile:
+			pickle.dump(self.allNGrams, nGramFile)
+			nGramFile.close()
+		print(self.poisson_training_results.summary())
+
+
+	def testPoisson(self, testTweets):
+		self.nGramIndices = {}
+		counter = 0;
+		for nGram in self.allNGrams:
+			self.nGramIndices[nGram] = counter
+			counter += 1;
+
+		numCorrect = 0;
+
+		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
+		print("predicting dims: ", predictionMatrix.shape);
+
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets);
+
+		poisson_predictions = self.poisson_training_results.get_prediction(predictionMatrix)
+		# .summary_frame() returns a pandas DataFrame
+		predictions_summary_frame = poisson_predictions.summary_frame()
+		poisson_predictions = poisson_predictions.predicted_mean;
+
+
+		predicted_counts = predictions_summary_frame['mean']
+		actual_counts = [ac[0] for ac in list(targetMatrix)]
+
+
+
+		for i in range(poisson_predictions.shape[0]):
+			prediction = poisson_predictions[i];
+			target = targetMatrix[i][0];
+			if (round(prediction, 0) - round(target, 0)) == 0:
+				numCorrect += 1;
+
+		print(numCorrect / len(testTweets))
+
+		xes = [i for i in range(poisson_predictions.shape[0])]
+
+		# Mlot the predicted counts versus the actual counts for the test data.
+		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		fig.subplots_adjust(left=0.06, right=0.94)
+		fig.suptitle('Predicted FavCounts and real FavCounts (log)')
+		plt.plot(xes, poisson_predictions, 'go-', label='Predicted counts')
+		plt.plot(xes, actual_counts, 'ro-', label='Actual counts')
+		plt.legend()
+		plt.show()
+
+	def train(self,trainingTweets):
+		self.trainingTweets = trainingTweets;
+
+		self.median = getMedianFavCountPresTweets(trainingTweets)
+
+		allNGrams = set();
+		self.nGramIndices = {}
+		allNGramsWithCountsDict = {}
+		self.ns = [1,2,3,4]#,3,4]
+		for n in self.ns:
+			computeMostCommonnGrams([tweet[0:2] for tweet in trainingTweets], n);
+			myNGramsWithCounts = getnGramsWithOverMOccurences(n, 2, hashTweets([tweet[0:2] for tweet in trainingTweets]))
+			myNGramsWithCountsDict = {nGram[0]:nGram[1] for nGram in myNGramsWithCounts}
+			myNGrams = [nGram[0] for nGram in myNGramsWithCounts]
+			allNGrams.update(myNGrams)
+			allNGramsWithCountsDict.update(myNGramsWithCountsDict)
+
+		# for tweet in self.trainingTweets:
+		# 	cleanedText = tweet[1]
+		# 	nGrams = extractNGramsFromCleanedText(cleanedText,ns)
+		# 	allNGrams.update(nGrams);
+		counter = 0;
+		for nGram in allNGrams:
+			self.nGramIndices[nGram] = counter
+			counter += 1;
+
+		self.allNGrams = allNGrams;
+		self.allNGramsWithCountsDict = allNGramsWithCountsDict;
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets)
+		print("dims: ", bigMatrix.shape);
+		startTime = time.time()
+		clf = KernelRidge(alpha=100.0, kernel='linear')
+		clf.fit(bigMatrix, targetMatrix)
+
+		# f = open("")
+
+		self.clf = clf;
+		if False:
+			self.weights = np.linalg.lstsq(bigMatrix, targetMatrix)[0];
+		print("trained in : ",time.time()-startTime)
+
+		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
+
+
+	def test(self,testTweets):
+
+		numCorrect = 0;
+
+		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
+		print("predicting dims: ", predictionMatrix.shape);
+
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets);
+
+
+		predictions =self.clf.predict(predictionMatrix);
+		for i in range(predictions.shape[0]):
+			prediction = predictions[i][0];
+			target = targetMatrix[i][0];
+			if (round(prediction,0)-round(target,0)) == 0:
+				numCorrect += 1;
+
+		print(numCorrect/len(testTweets))
+
+
+
+
+
 
 
 
@@ -186,6 +521,8 @@ class AllCapsClassifier():
 leaveout middle part
 perceptron update?
 CNN
+MLP nochmal
+tsni
 
 https://github.com/bentrevett/pytorch-sentiment-analysis part 4
 
