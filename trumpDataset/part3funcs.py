@@ -64,11 +64,10 @@ def computeMostCommonnGrams(tweets, n, retabulate = False):
 	'''
 
 	tweetsHash = hashTweets([tweet[0:2] for tweet in tweets])
-	print("usay: ",tweetsHash);
 	if not retabulate:
 		try:
 			open('trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p', 'rb');
-			print("Opened archive")
+			print("Opened archive " + 'trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p')
 			return;
 		except:
 			print(Fore.RED,"no archive exists for " + tweetsHash +"( that's "+str(len(tweets))+" tweets) " + str(n) + "-grams; retabulating");
@@ -91,7 +90,6 @@ def computeMostCommonnGrams(tweets, n, retabulate = False):
 	vocabAndnGramCounts.sort(key=lambda tup: tup[1], reverse=True)
 
 
-	print("dirtayyy\n",os.listdir("."));
 	with open('trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p', 'wb') as fp:
 		print("writing file: ",'trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p')
 		pickle.dump(vocabAndnGramCounts, fp)
@@ -111,7 +109,7 @@ def getnGramsWithOverMOccurences(n,m,tweetHash):
 
 
 	try:
-		filePath = "trumpBA/trumpDataset/npStores/"+str(n)+"GramsInDescendingFrequency"+tweetHash+".p"
+		filePath = "trumpBA/trumpDataset/npStores/"+str(n)+"GramsInDescendingFrequency"+str(tweetHash)+".p"
 		nGramsInDescendingFrequencyFile = open(filePath, "rb");
 
 	except:
@@ -171,7 +169,7 @@ def getMMostLeastPopularnGramsWithCounts(m, n,tweetHashes, percentage = False):
 def numberButNotYear(token):
 	return token.like_num and not (str(token).isdigit() and 1800 < int(str(token)) < 2100)
 
-def computePercentageAllCaps(doc):
+def computePercentageAllCapsAndUppersList(doc):
 	origDoc = doc;
 
 	doc = doc.strip()
@@ -201,12 +199,13 @@ def computePercentageAllCaps(doc):
 
 	doc = doc.strip()
 	if len(doc)<1:
-		return 0;
+		return 0,"";
 	nlpTweetText = nlp(doc)
 
 
 	upperCount = 0;
 	totalCount = 0;
+	uppers = []
 	try:
 		for token in nlpTweetText:
 			s = token.string.strip();
@@ -214,6 +213,7 @@ def computePercentageAllCaps(doc):
 			if len(s) <= 1 or s[0] == "@":
 				continue #ambiguous
 			elif token.string == token.string.upper():
+				uppers.append(token.string.upper());
 				upperCount += 1;
 			totalCount += 1;
 	except:
@@ -221,8 +221,44 @@ def computePercentageAllCaps(doc):
 		exit()
 
 	if totalCount == 0:
-		return 0;
-	return upperCount/totalCount
+		return 0, "";
+	return upperCount/totalCount, " ".join(uppers);
+
+
+def normalize_headline(doc):
+    # lower case and remove special characters\whitespaces
+	doc = doc.lower()
+	doc = doc.strip()
+	doc = doc.replace('\n', ' ')
+
+
+
+
+
+	doc = re.sub("&amp;", "and", doc)
+	doc = re.sub("w/", "with", doc)
+	doc = re.sub('[/\-]', ' ', doc)
+	doc = re.sub(r'[^a-zA-Z0-9\s\@\#]', '', doc, re.I|re.A)
+	doc=re.sub("\.", "", doc)
+
+
+	nlpTweetText = nlp(doc)
+
+	wordLemmas = []
+	for token in nlpTweetText:
+		if unworthynessOfToken(token):
+			continue;
+
+		elif token.lemma_ in ['pm','am']:
+			wordLemmas.append(token.lemma_[0]+"."+token.lemma_[1]+".")
+		elif token.string.strip()[0] == "@":
+			wordLemmas.append(token.string.strip())
+		else:
+			wordLemmas.append(token.lemma_)
+
+
+	return " ".join(wordLemmas);
+
 
 def normalize_document(doc):
     # lower case and remove special characters\whitespaces

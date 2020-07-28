@@ -7,7 +7,7 @@ from .basisFuncs import *
 from .stats import zScore;
 from .visualization import graphTwoDataSetsTogether;
 from .deletedAndAllCaps import getAllCapsSkewForAboveThreshold;
-import statsmodels.api as sm
+import statsmodels.api as sm #scikit
 from sklearn.kernel_ridge import KernelRidge
 
 
@@ -227,7 +227,8 @@ class OlsTry():
 	'''
 	todo: how to tell OLS to focus on parameters which have a lower std?
 	'''
-
+	def __init__(self,percentile):
+		self.percentile = percentile;
 	def createDataAndTargetMatrices(self, tweets):
 		favs = [t[0] for t in tweets];
 		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)));
@@ -241,7 +242,7 @@ class OlsTry():
 					bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
 
 				# if zScore(favs,tweet[0]) > 1:
-				if tweet[0]> self.ninetiethPercentileFavCount:
+				if tweet[0]> self.twoClassBarrierCount:
 					targetMatrix[tweetIndex] = 10
 				else:
 					targetMatrix[tweetIndex] = -10;
@@ -249,13 +250,11 @@ class OlsTry():
 		return bigMatrix,targetMatrix
 	def train(self,trainingTweets):
 		trainingTweets.sort(key=lambda tuple: tuple[0], reverse=False)
-		self.ninetiethPercentileFavCount = trainingTweets[int(len(trainingTweets)*0.9)][0];
+		self.twoClassBarrierCount = trainingTweets[int(len(trainingTweets) * self.percentile)][0];
 
 		self.trainingTweets = trainingTweets;
 
 		self.median = getMedianFavCountPresTweets(trainingTweets)
-
-
 
 		allNGrams = set();
 		self.nGramIndices = {}
@@ -269,10 +268,7 @@ class OlsTry():
 			allNGrams.update(myNGrams)
 			allNGramsWithCountsDict.update(myNGramsWithCountsDict)
 
-		# for tweet in self.trainingTweets:
-		# 	cleanedText = tweet[1]
-		# 	nGrams = extractNGramsFromCleanedText(cleanedText,ns)
-		# 	allNGrams.update(nGrams);
+
 		counter = 0;
 		for nGram in allNGrams:
 			self.nGramIndices[nGram] = counter
@@ -288,7 +284,7 @@ class OlsTry():
 		self.clf = clf;
 		if False:
 			self.weights = np.linalg.lstsq(bigMatrix, targetMatrix)[0];
-		print("trained in : ",time.time()-startTime)
+		print("OlsTry trained in : ",time.time()-startTime)
 
 		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
 
@@ -318,9 +314,10 @@ class OlsTry():
 		plt.plot(xes, targetMatrix, 'go-', label='Actual Counts')
 		plt.plot(xes, predictions, 'ro-', label='Predicted Counts')
 		plt.legend()
+		print(numCorrect / len(testTweets))
 		plt.show()
 
-		print(numCorrect/len(testTweets))
+
 
 
 
@@ -491,7 +488,7 @@ class LogRegressionSlashPoisson():
 		self.clf = clf;
 		if False:
 			self.weights = np.linalg.lstsq(bigMatrix, targetMatrix)[0];
-		print("trained in : ",time.time()-startTime)
+		print("LogRegressionSlashPoisson trained in : ",time.time()-startTime)
 
 		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
 

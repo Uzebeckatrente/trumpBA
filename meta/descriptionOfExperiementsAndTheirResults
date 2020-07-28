@@ -1,0 +1,6 @@
+Task: differentiate tweet popularity classes by their words.
+Base case: 2 classes. Where to make the cut?
+Well, if we do two classes, split in half, that has little semantic value, as the increase is very flat most of the way.
+If we split at 90%, we get really the only spike at the end, but that leaves us with very little data from class 2.
+If we split at 75%, we hit the start of the derivative increase, a good compromise.
+

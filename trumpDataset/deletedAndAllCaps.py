@@ -1,6 +1,6 @@
 
 from .basisFuncs import *
-from .part3funcs import computePercentageAllCaps;
+from .part3funcs import computePercentageAllCapsAndUppersList;
 from .visualization import graphTwoDataSetsTogether;
 from .stats import pearsonCorrelationCoefficient;
 from .favs import getMedianFavCountPresTweets,getMeanFavCountPresTweets;
@@ -35,7 +35,7 @@ def populateIsReplyColumn():
 	:return:
 	'''
 	updateFormula = "UPDATE " + mainTable + " SET isReply = %s WHERE id = %s";
-	tweets = [tweet[0] for tweet in getTweetsFromDB(purePres=False,conditions=["isReply = -1"],returnParams=["id"])]
+	tweets = [tweet[0] for tweet in getTweetsFromDB(purePres=False,conditions=["isReply = 2"],returnParams=["id"])]
 	print("total of ", len(tweets), " tweets to update")
 	tuples = []
 	i=0;
@@ -47,7 +47,7 @@ def populateIsReplyColumn():
 		for t in tObjs:
 			if t.in_reply_to_screen_name != None:
 				if t.in_reply_to_screen_name.lower() == "realdonaldtrump":
-					tuples.append((2,t.id))
+					tuples.append((t.in_reply_to_status_id,t.id))
 				else:
 					tuples.append((1,t.id))
 			else:
@@ -75,8 +75,29 @@ def populateAllCapsPercentageColumn():
 	tuples = []
 	for index,tweet in enumerate(tweets):
 		text = tweet[1];
-		percentageCaps = computePercentageAllCaps(text);
+		percentageCaps = computePercentageAllCapsAndUppersList(text);
 		tuples.append((str(round(percentageCaps,2)),tweet[0]))
+		if index%100==0:
+			print(index/len(tweets))
+	mycursor.executemany(updateFormula,tuples);
+	mydb.commit()
+
+
+	print("executed")
+	mydb.commit()
+
+
+def populateAllCapsWords():
+
+	tweets = getTweetsFromDB(returnParams=["id","tweetText"])
+	mycursor.execute("select id, tweetText from "+mainTable)
+	updateFormula = "UPDATE "+mainTable+" SET allCapsWords = %s WHERE id = %s";
+	print("total of ",len(tweets)," tweets to update")
+	tuples = []
+	for index,tweet in enumerate(tweets):
+		text = tweet[1];
+		_, uppers = computePercentageAllCapsAndUppersList(text);
+		tuples.append((uppers,tweet[0]))
 		if index%100==0:
 			print(index/len(tweets))
 	mycursor.executemany(updateFormula,tuples);

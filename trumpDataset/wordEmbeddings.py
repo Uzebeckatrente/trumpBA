@@ -1,5 +1,9 @@
 import fasttext
 from .basisFuncs import *
+from .part3funcs import unworthynessOfToken;
+import spacy
+nlp = spacy.load("en_core_web_lg")  # make sure to use larger model!
+
 
 def writeCleanedTotxtFile(fileName = "trumpDataset/clean.txt"):
 	f = open(fileName,"w")
@@ -21,6 +25,19 @@ def computeWordEmbeddings(cleanFile = "trumpDataset/clean.txt", embeddingsFile =
 
 		model.save_model(embeddingsFile)
 	return model
+
+
+def getSumOfVectorsForTweet(oneGrams, tfidfScores):
+	if len(oneGrams) == 0:
+		print(oneGrams);
+		return np.zeros((300,));
+	tokens = nlp(" ".join(oneGrams));
+	tokenSum = np.zeros(tokens[0].vector.shape);
+	for i in range(len(oneGrams)):
+		tokenSum += tokens[i].vector*tfidfScores[i]
+	tokenSum /= len(oneGrams);
+	return tokenSum;
+
 
 
 

@@ -7,7 +7,15 @@ except:
 	from trumpBA.trumpDataset import *;
 # import trumpBA.trumpDataset
 import time
+from sklearn.model_selection import train_test_split
+# analyzeAllCapsPercentage();
+# exit();
+# graphPopularityByTweetsPerDay();
 
+# graphFavCount();
+#
+# graphFavCountAndDerivative()
+# exit();
 # graphFavCountLogRound()
 # tweet = getTweetById(1194648339071016961)
 # print(tweet)
@@ -15,7 +23,8 @@ import time
 # populateCleanedTextColumn()
 # exit()
 # exit()
-
+# analyzeAllCapsPercentage();
+# exit();
 # populateDeletedColumn()
 # fixIsRt(processTrumpTwitterArchiveFile())
 # processTrumpTwitterArchiveFile()
@@ -66,73 +75,221 @@ import time
 #
 # analyzeTopAndBottomPercentiles()
 # compareVocabOverTime(18)
+# populateNewsHeadlinesTable()
+
 # for epochCount in range(3,101,3):
 # 	compareVocabOverTime(epochCount)
 # # compareVocabOverTime(5)
 # exit()
 
 
+# t1 = getTweetById(986318102735572992);
+# t2 = getTweetById(1157352001593892864);
+
+
 np.random.seed(69)
-allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType"], orderBy= "publishTime desc")
+allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"], orderBy= "publishTime asc")
+normalizedTweets = normalizeTweetsFavCountsSlidingWindowStrategy(allPresTweetsFavCountAndCleanedText,30, determinator = "mean");
+normalizedTweetsFixedWindow = normalizeTweetsFavCountsFixedWindowStrategy(allPresTweetsFavCountAndCleanedText,30, determinator = "mean");
 
-indices = np.random.permutation(len(allPresTweetsFavCountAndCleanedText))
-numFolds = 5;
-foldsIndices = [indices[int(len(allPresTweetsFavCountAndCleanedText)*(0.2*i)):int(len(allPresTweetsFavCountAndCleanedText)*(0.2*i+1))] for i in range(numFolds)]
-training_idx, test_idx = indices[:int(len(allPresTweetsFavCountAndCleanedText)*0.8)], indices[int(len(allPresTweetsFavCountAndCleanedText)*0.8):]
-training = []
-test = []
-folds = []
-for indices in foldsIndices:
-	fold = []
-	for i in indices:
-		fold.append(allPresTweetsFavCountAndCleanedText[i]);
-	folds.append(fold);
 
-for i in range(len(allPresTweetsFavCountAndCleanedText)):
-	if len(allPresTweetsFavCountAndCleanedText[i][1])>0:
-		if i in training_idx:
-			training.append(allPresTweetsFavCountAndCleanedText[i])
-		else:
-			test.append(allPresTweetsFavCountAndCleanedText[i])
+# graphFavCount(allPresTweetsFavCountAndCleanedText,title="unnormalized");
+# graphFavCount(normalizedTweets,title="normalizedSlidingWindow");
+# graphFavCount(normalizedTweetsFixedWindow,title="normalizedFixedWindow");
+
+
+
+# graphTwoDataSetsTogether([t[0] for t in normalizedTweets],"ansatz Sliding",[t[0] for t in normalizedTweetsFixedWindow]," ansatz Fixed");
+
+
+
+allPresTweetsFavCountAndCleanedTextByYear5 = splitTweetsByYear(allPresTweetsFavCountAndCleanedText,5);
+allPresTweetsFavCountAndCleanedTextByYear5Normalized = splitTweetsByYear(normalizedTweets,5);
+allPresTweetsFavCountAndCleanedTextByYear3 = splitTweetsByYear(allPresTweetsFavCountAndCleanedText,4);
+
+
+# graphPopularityOfTweetsInSpurts();
+# graphPopularityByTweetsPerDay(allPresTweetsFavCountAndCleanedText);
+# graphPopularityByWeekday(allPresTweetsFavCountAndCleanedText)
+# graphPopularityByDayTime(allPresTweetsFavCountAndCleanedText)
+#
+# exit();
+
+# populateNewsRatioColumn()#;(allPresTweetsFavCountAndCleanedText);
+
+
+trainingLastYear, testLastYear, foldsLastYear = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+trainingLastYearNorm, testLastYearNorm, foldsByYearNorm = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear5Normalized[-1])
+trainingLastYearNorm.sort(key = lambda x: x[0]);
+trainingLastYear3, testLastYear3, _ = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear3[-1])
+training, test, folds = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
+trainingNorm, testNorm, foldsNorm = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
+allTweets = training+test;
+
+
 print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," test tweets",Style.RESET_ALL);
 
-allCapsClassifier = AllCapsClassifier()
-mlpClassifier = MLPPopularity();
-poissonClassifier = LogRegressionSlashPoisson();
-olsClassifier = OlsTry()
-mlpClassifier.train(training)
-# poissonClassifier.train(training,reload=False)
-mlpClassifier.test(training);
-mlpClassifier.test(test);
+
+
+
+
+
+# allCapsClassifier = AllCapsClassifier()
+newPoissonClassifier = RegressionModel("mlpClassifier");
+newPoissonClassifier2 = RegressionModel("mlPoisson");
+
+# wordEmbeddingMatrix = newPoissonClassifier.computeWordEmbeddingMatrix(trainingLastYear);
+# print(wordEmbeddingMatrix);
+
+# newPoissonClassifier.train(trainingLastYear,percentileSplit=0.75,percentileNegativePositive=-1,hiddenLayers=(3,),wordEmbeddingMatrix=True);
+# newPoissonClassifier.test(trainingLastYear,title="training",crossVal=False);
+# scoreNew = newPoissonClassifier.test(testLastYear, title="test",crossVal=False);
+#
+# newPoissonClassifier.train(trainingLastYear,percentileSplit=0.75,percentileNegativePositive=-1,wordEmbeddingMatrix=False);
+# newPoissonClassifier.test(trainingLastYear,title="training",crossVal=False);
+# scoreNew = newPoissonClassifier.test(testLastYear, title="test",crossVal=False);
+
+
+# print("XVAL on neg/pos ratio for last year")
+# newPoissonClassifier.crossValAllCapsBoostTargetMatrix(allPresTweetsFavCountAndCleanedTextByYear5[-1]);
+# print("XVAL neg/pos ratio for whole time span")
+# exit();
+# mlpClassifier = MLPPopularity(0.15);
+# mlpClassifier.train(trainingLastYear);
+# mlpClassifier.test(trainingLastYear,display = True, title="training");
+# scoreOld = mlpClassifier.test(testLastYear,display = True,title="test");
+#
+# newPoissonClassifier.crossValPercentageOfGramsToTake(trainingLastYearNorm)#,alpha=0.1,percentageNGrams=0,wordEmbeddingMatrix=True);
+
+#
+newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=30);
+newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=True",crossVal=False);
+scoreNew = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=True",crossVal=False);
+#
+# newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.2,wordEmbeddingMatrix=False);
+# newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=False",crossVal=False);
+# scoreNew = newPoissonClassifier2.test(testLastYearNorm, title="test wordEmbeddingMatrix=False",crossVal=False);
+#
+# newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.5,wordEmbeddingMatrix=True);
+# newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=True",crossVal=False);
+# scoreNew = newPoissonClassifier2.test(testLastYearNorm, title="test wordEmbeddingMatrix=True",crossVal=False);
+#
+# newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.5,wordEmbeddingMatrix=False);
+# newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=False",crossVal=False);
+# scoreNew = newPoissonClassifier2.test(testLastYearNorm, title="test wordEmbeddingMatrix=False",crossVal=False);
+
+# newPoissonClassifier.crossValNumHiddenLayers(allPresTweetsFavCountAndCleanedTextByYear5[-1]);
+# plt.plot([1,2],[1,2])
+# plt.show();
+# newPoissonClassifier2.crossValNumHiddenLayers(allPresTweetsFavCountAndCleanedTextByYear5[-1]);
+#
+# exit();
+
+
+
+# newPoissonClassifier.train(training);
+# newPoissonClassifier.test(training,title="training",crossVal=True);
+# scoreNew = newPoissonClassifier.test(test, title="test",crossVal=True);
+#
+# newPoissonClassifier.train(trainingNorm);
+# newPoissonClassifier.test(trainingNorm,title="training",crossVal=True);
+# scoreNew = newPoissonClassifier.test(testNorm, title="test",crossVal=True);
+#
+# newPoissonClassifier.train(trainingLastYear,allCapsBoost=0);
+# newPoissonClassifier.test(trainingLastYear,title="training",crossVal=False);
+# scoreNew = newPoissonClassifier.test(testLastYear, title="test",crossVal=False);
+#
+# newPoissonClassifier.train(trainingLastYear,allCapsBoost=0.5);
+# newPoissonClassifier.test(trainingLastYear,title="training",crossVal=False);
+# scoreNew = newPoissonClassifier.test(testLastYear, title="test",crossVal=False);
+
+# newPoissonClassifier.train(trainingLastYearNorm);
+# newPoissonClassifier.test(trainingLastYearNorm,title="training",crossVal=True);
+# scoreNew = newPoissonClassifier.test(testLastYearNorm, title="test",crossVal=True);
+
+scores = {};
+
+# favouriteOverTimeTrends();
+
+if True:
+	scores["allNormalized"]= [];
+	for i in range(len(foldsNorm)):
+		trainFlat, holdOut = flattenFolds(foldsNorm, i)
+		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
+		# poissonClassifier.train(training,reload=False)
+		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
+		score=newPoissonClassifier2.test(holdOut,"test",crossVal=True);
+		scores["allNormalized"].append(score);
+
+	scores["allRegular"]= [];
+	for i in range(len(foldsNorm)):
+		trainFlat, holdOut = flattenFolds(foldsNorm, i)
+		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
+		# poissonClassifier.train(training,reload=False)
+		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
+		score=newPoissonClassifier2.test(holdOut,"test",crossVal=True);
+		scores["allRegular"].append(score);
+	# 
+	# 
+	# scores["fifthNormalized"]= [];
+	# for i in range(len(foldsByYearNorm)):
+	# 	trainFlat, holdOut = flattenFolds(foldsByYearNorm, i)
+	# 	newPoissonClassifier.train(trainFlat,extraParamNum=0)
+	# 	# poissonClassifier.train(training,reload=False)
+	# 	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
+	# 	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
+	# 	scores["fifthNormalized"].append(score);
+
+for s in scores.keys():
+	scores[s] = np.mean(scores[s]);
+print(scores);
+
 exit()
 
-
-# allCapsClassifier.test(test,title="test data");
-#
-# allCapsClassifier.train(training);
-# misClassifiedsAllCaps =allCapsClassifier.test(test,training=False,title="tist data")[0];
-# misClassifiedsAllCaps.sort(key=lambda tup: tup[0]);
-# #
-# naiveBayesClassifier = PureBayesClassifier()
-# naiveBayesClassifier.train(training,testData = test,retabulate = False)
-# naiveBayesClassifier.predict("peaceofficersmemorialday")
-# print(Fore.CYAN,"test error: ")
-# misClassifiedNaive = naiveBayesClassifier.test(test, title="naive bayes baybayy")
-# print(Fore.LIGHTRED_EX,"train error: ")
-# naiveBayesClassifier.test(training, title="training naive")
-# #
-#
-#
+scores["fifthWithEmbedding"]= [];
+for i in range(len(foldsLastYear)):
+	if i == 4:
+		print(i);
+	trainFlat, holdOut = flattenFolds(foldsLastYear, i)
+	newPoissonClassifier.train(trainFlat,extraParamNum=0,wordEmbeddingMatrix=True)
+	# poissonClassifier.train(training,reload=False)
+	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
+	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
+	scores["fifthWithEmbedding"].append(score);
 
 
-booster = MixedBoostingBayesClassifier()
+
+scores["fifthSansEmbedding"]= [];
+for i in range(len(foldsLastYear)):
+	trainFlat, holdOut = flattenFolds(foldsLastYear, i)
+	newPoissonClassifier.train(trainFlat,extraParamNum=0,wordEmbeddingMatrix=False)
+	# poissonClassifier.train(training,reload=False)
+	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
+	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
+	scores["fifthSansEmbedding"].append(score);
+
+
+
+
+
+
+
+# booster = MixedBoostingBayesClassifierPercentile(percentile=0.5)
+# booster = MixedBoostingBayesClassifier();
+
+# mlpClassifier =
 
 booster.train(training,testData = test,retabulate = False)
 
-
-
 print(Fore.CYAN,"test error onlyLen True: ")
-misClassifiedsBooster = booster.test(test,title="post")
+misClassifiedsBooster = booster.test(test,title="testing data mixed")
+booster.test(training,title="training data mixed")
+
+naiveClassifier = PureBayesClassifier([1,2,3,4],0.25)
+naiveClassifier.train(training);
+
+misClassifiedNaive=naiveClassifier.test(test,title="test data naive");
+naiveClassifier.test(training,title="training data naive");
 
 allMisClassifieds = []
 for l in misClassifiedNaive:
@@ -280,4 +437,12 @@ plt.show()
 # print(time.time()-timeStart)
 '''
 some rt's media is incomplete
+
+Main observation: easier to learn lower percentiles.
+Probably: the viral tweets use lots of unusual words, whereas there are typical "boring" triggers in his low-tweets
+
+
+Observation: tweet popularity changes over time, it makes most sense to view tweets in a local time window. What makes tweets fluctuate by time?
+
+
 '''

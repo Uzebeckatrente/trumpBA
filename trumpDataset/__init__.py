@@ -11,4 +11,7 @@ from .pureBayesClassifier import *
 from .weakClassifiers import *;
 from .cleanedTextDB import *;
 from .vocabChangeOverTime import *;
+from .news import *;
+from .daysOfTheWeek import *;
+from .formalLearningForJuly10 import *;
 

@@ -14,6 +14,7 @@ from colorama import Fore, Style
 import numpy as np
 import spacy
 nlp = spacy.load("en")
+extraParamNames = ["allCapsRatios","daysOfWeek","timesOfDay","years"]
 
 lastEpochAndGram = (None,None);
 
@@ -29,7 +30,16 @@ mydb = mysql.connector.connect(host="localhost",user="root",passwd="felixMySQL",
 mycursor = mydb.cursor(buffered=True)
 
 mainTable = "tta2"
-purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0"]
+purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0","mediaType = \"none\""]
+
+def flattenFolds(folds, holdoutIndex):
+	if holdoutIndex != -1:
+		train = folds[0:holdoutIndex] + folds[holdoutIndex + 1:];
+		trainFlat = [item for sublist in train for item in sublist]
+		holdOut = folds[holdoutIndex];
+		return trainFlat, holdOut
+	else:
+		return [item for sublist in folds for item in sublist]
 
 def getTweetById(id: int):
 	return getTweetsById([id])
@@ -41,8 +51,45 @@ def getTweetsById(ids: [int]):
 def computeBigrams(tweetWords):
 	return [tweetWords[i] + " " + tweetWords[i + 1] for i in range(len(tweetWords) - 1)]
 
+def splitTrainingTest(tweets, numFolds = 5):
+
+	indices = np.random.permutation(len(tweets))
+	foldsIndices = [indices[int(len(tweets) * (0.2 * i)):int(len(tweets) * (0.2 * (i + 1)))] for i in range(numFolds)]
+
+	training_idx, test_idx = indices[:int(len(tweets) * 0.8)], indices[int(len(tweets) * 0.8):]
+	training = []
+	test = []
+	folds = []
+	for indices in foldsIndices:
+		fold = []
+		for i in indices:
+			fold.append(tweets[i]);
+		folds.append(fold);
+
+	for i in range(len(tweets)):
+		if len(tweets[i][1]) > 0:
+			if i in training_idx:
+				training.append(tweets[i])
+			else:
+				test.append(tweets[i])
+	return training, test, folds
+
+def splitTweetsByYear(tweets,numYears):
+	tweets.sort(key = lambda t: t[4],reverse=False);
+	totalTime = tweets[-1][4] - tweets[0][4];
+	timePerYear = totalTime / numYears;
+	startingDate = tweets[0][4]
+	endingDate = startingDate + timePerYear;
+	tweetsByYear = [];
+	for i in range(numYears):
+		theseTweets = [t for t in tweets if startingDate <= t[4] <= endingDate];
+		tweetsByYear.append(theseTweets)
+		startingDate = endingDate;
+		endingDate += timePerYear;
+	return tweetsByYear;
 
 def hashTweets(tweets):
+	tweets = [t[:2] for t in tweets];
 	tweets.sort(key= lambda tup: tup[1]+str(tup[0]), reverse=True)
 	myString = str(tweets);
 	return hasher(myString.encode()).hexdigest()
@@ -90,12 +137,11 @@ def getApprovalRatings():
 	ratings = mycursor.fetchall()
 	return ratings;
 
-def getFavsByNGram(keyword, rts = True):
-	conditions = ["cleanedText like \"%" + keyword + "%\"","president","deleted = 0"]
-	if not rts:
-		conditions.append("isRt = 0")
-	favs = getTweetsFromDB(n=-1, conditions=conditions, returnParams=[ "favCount"], orderBy="favCount");
-	return [fav[0] for fav in favs]
+def getFavsByNGram(keyword,tweets):
+
+	relevantTweets = [t[0] for t in tweets if keyword in t[1]];
+	return relevantTweets;
+	# return [fav[0] for fav in favs]
 
 
 
@@ -112,8 +158,18 @@ def getRootUrl(url):
 def timeStampToDateTime(ts):
 	return datetime.datetime(int(ts[0:4]),int(ts[4:6]),int(ts[6:8]))
 
+def paddify(s):
+	if len(s) == 1:
+		return "0"+s;
+
+def dateTimeToMySQLTimeStampWithHoursAndMinutes(dt: datetime.datetime):
+	return str(dt.year)+":"+str(dt.month)+":"+str(dt.day)+" "+str(dt.hour)+":"+str(dt.minute)+":00"
+
 def dateTimeToMySQLTimeStamp(dt):
 	return str(dt.year)+":"+str(dt.month)+":"+str(dt.day)+" 00:00:00"
+
+def convertYYYYMMDDtoMySQLTimeStamp(date):
+	return date[:4]+":"+date[4:6]+":"+date[6:]+" 00:00:00";
 
 def camlify(string, firstLetterCapital = True):
 	string = string.rstrip().lstrip()
@@ -149,6 +205,7 @@ def on_plot_hover(event,plot,nGramsForAllEpochsRegularized):
 
 def randomHexColor():
 	#generates a random color string
+	# return '#D6FC36'
 	return "#"+('000000'+hex(np.random.randint(16777216))[2:])[-6:].upper();
 
 def getTweetsFromDB(n=-1,purePres = False, conditions=[], returnParams="*",orderBy = "publishTime desc"):#president = False, allParams = False,inclRts = False):
@@ -345,6 +402,13 @@ def processTrumpTwitterArchiveFile(fileName = None):
 	print("first tweet: ",tweets[0])
 	return tweets
 
+def selectRandomBatch(sourceTweets, batchSize):
+	indices = np.random.permutation(len(sourceTweets))
+	batchIndices = indices[:batchSize]
+	batch = []
+	for i in batchIndices:
+		batch.append(sourceTweets[i])
+	return batch;
 
 def appendToDB(toAppendFile):
 	'''
@@ -456,5 +520,6 @@ def processRealDonaldTrumpFile():
 	There are three tweets that do not have full data. We will ignore these
 
 	Which day of the week; holidays? when are people on twitter more
+	
 	'''
 

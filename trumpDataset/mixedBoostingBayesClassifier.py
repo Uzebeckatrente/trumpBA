@@ -1,10 +1,11 @@
 from .stats import ols
 from .favs import getMedianFavCountPresTweets, getMeanFavCountPresTweets, \
-	calculateAndStorenGramsWithFavsMinusMeanMedian, loadnGramsWithFavsMinusMeanMedian
+	calculateAndStorenGramsWithFavsMinusMeanMedian, loadnGramsWithFavsMinusMeanMedian,loadnGramsWithFavsMinusPercentile,calculateAndStorenGramsWithFavsMinusPercentile
 from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences, computeMostCommonnGrams
 from .media import removeMediaFromTweet
 from .basisFuncs import *
 from .deletedAndAllCaps import getAllCapsSkewForAboveThreshold;
+from .daysOfTheWeek import determineDayOfWeek,determineSegmentOfDay,determineYearOfTweet
 
 from keras import Sequential
 # from keras import initializers;
@@ -19,11 +20,39 @@ In this file:
 
 
 class MLPPopularity():
+	'''
+	TODO: Keras cross-validation
+	'''
+	
+	def __init__(self,percentile):
+		self.percentile = percentile;
 
-	def createDataAndTargetMatrices(self, tweets):
+	def getExtraParams(self,tweets, extraParamNum):
+		self.years = 5;
+		times = [t[4] for t in tweets];
+		self.minTime = min(times);
+		self.maxTime = max(times);
+		allCapsRatios = [t[2] for t in tweets];
+		daysOfWeek = [determineDayOfWeek(t[4]) for t in tweets]
+		timesOfDay = [determineSegmentOfDay(t[4]) for t in tweets]
+
+		years = [determineYearOfTweet(self.minTime, self.maxTime, years=self.years, t=t[4]) for t in tweets]
+		extraParams = [allCapsRatios,daysOfWeek,timesOfDay,years]
+		extraParamsToInclude = [];
+		self.extraParamNamesToInclude = []
+		for i in range(len(extraParams)):
+			if extraParamNum % 2 == 0:
+				extraParamsToInclude.append(extraParams[i]);
+				self.extraParamNamesToInclude.append(extraParamNames[i]);
+			extraParamNum = int(extraParamNum / 2);
+
+		return extraParamsToInclude
+
+	def createDataAndTargetMatrices(self, tweets, extraParameters = []):
 		favs = [t[0] for t in tweets];
-		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)));
+		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)+len(extraParameters)));
 		targetMatrix = np.ndarray((len(tweets), 1))
+		offSet = len(self.nGramIndices);
 
 		for tweetIndex, tweet in enumerate(tweets):
 			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
@@ -31,17 +60,26 @@ class MLPPopularity():
 				if nGram in self.nGramIndices:
 					nGramIndex = self.nGramIndices[nGram]
 					bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
-
-				# if zScore(favs,tweet[0]) > 1:
+			if self.percentile != -1:
 				if tweet[0]> self.ninetiethPercentileFavCount:
 					targetMatrix[tweetIndex] = 1
+				# elif tweet[0] < self.twoClassBarrierCountUnder:
+				# 	targetMatrix[tweetIndex] = -10;
 				else:
 					targetMatrix[tweetIndex] = 0;
 
+
+
+			for param in range(len(extraParameters)):
+				bigMatrix[tweetIndex][offSet + param] = extraParameters[param][tweetIndex];
+
+
 		return bigMatrix,targetMatrix
+
+
 	def train(self,trainingTweets):
 		trainingTweets.sort(key=lambda tuple: tuple[0], reverse=False)
-		self.ninetiethPercentileFavCount = trainingTweets[int(len(trainingTweets)*0.9)][0];
+		self.ninetiethPercentileFavCount = trainingTweets[int(len(trainingTweets)*self.percentile)][0];
 
 		self.trainingTweets = trainingTweets;
 
@@ -72,16 +110,19 @@ class MLPPopularity():
 
 		self.allNGrams = allNGrams;
 		self.allNGramsWithCountsDict = allNGramsWithCountsDict;
-		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets)
+		extraParams = self.getExtraParams(trainingTweets,0)
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets,extraParams)
+
+
 		print("dims: ", bigMatrix.shape);
 		startTime = time.time()
 
 		model = Sequential()
 		# model.add(Dense(12, input_dim=inputDim, activation='relu'))
-		model.add(Dense(12, input_dim=bigMatrix.shape[1], activation='relu',use_bias=True))
+		model.add(Dense(20, input_dim=bigMatrix.shape[1], activation='relu',use_bias=True))
 		model.add(Dense(1, activation='sigmoid',use_bias=True))
 		model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-		model.fit(bigMatrix, targetMatrix, epochs=50, batch_size=int(bigMatrix.shape[0]/5))
+		model.fit(bigMatrix, targetMatrix, epochs=15, batch_size=int(bigMatrix.shape[0]/5))
 
 		B_Input_Hidden = model.layers[0].get_weights()[1]
 		B_Output_Hidden = model.layers[1].get_weights()[1]
@@ -93,7 +134,7 @@ class MLPPopularity():
 		# self.weights = np.dot(np.dot(np.linalg.inv(np.dot(bigMatrix, targetMatrix)),bigMatrix),targetMatrix.T)
 
 
-	def test(self,testTweets):
+	def test(self,testTweets, title="", display = True):
 
 
 		testTweets.sort(key=lambda tup: tup[0]);
@@ -103,7 +144,8 @@ class MLPPopularity():
 		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
 		print("predicting dims: ", predictionMatrix.shape);
 
-		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets);
+		extraParams = self.getExtraParams(testTweets,0)
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets,extraParams);
 		actualFavs = [t[0] for t in testTweets];
 		# predictionMatrix = np.array([-123]*predictionMatrix.shape[0]);
 		predictions = self.model.predict_classes(predictionMatrix)
@@ -116,20 +158,21 @@ class MLPPopularity():
 			target = targetMatrix[i][0]
 			prod = prediction*target;
 			if prediction == 0 and target == 0 or prediction > 0 and target > 0:
-				correctPredictionsAggregator[prediction] += 1;
-			predictionsAggregator[prediction] += 1;
+				correctPredictionsAggregator[target] += 1;
+			predictionsAggregator[target] += 1;
 
+		score = 0.5*(correctPredictionsAggregator[0]/predictionsAggregator[0])+0.5*(correctPredictionsAggregator[1]/predictionsAggregator[1]);
+		if display:
+			xes = [i for i in range(len(testTweets))];
+			fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+			fig.subplots_adjust(left=0.06, right=0.94)
+			fig.suptitle('Predicted FavCounts and real FavCounts (log) for '+title + " score: "+str(round(score,2)))
+			plt.plot(xes, targetMatrix, 'g', label='Actual Counts')
+			plt.plot(xes, predictions, 'r', label='Predicted Counts')
+			plt.legend()
 
-		xes = [i for i in range(len(testTweets))];
-		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-		fig.subplots_adjust(left=0.06, right=0.94)
-		fig.suptitle('Predicted FavCounts and real FavCounts (log)')
-		plt.plot(xes, targetMatrix, 'g', label='Actual Counts')
-		plt.plot(xes, predictions, 'r', label='Predicted Counts')
-		plt.legend()
-		plt.show()
-
-		print(0.5*(correctPredictionsAggregator[0]/predictionsAggregator[0])+0.5*(correctPredictionsAggregator[1]/predictionsAggregator[1]));
+			plt.show()
+		return score;
 
 
 
@@ -340,7 +383,7 @@ class MixedBoostingBayesClassifier():
 	def sourceNgramsForCurrentSavedSelfNsTweetsHash(self):
 		t = time.time()
 
-		self.nGramsWithFavsMinusMean, self.nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(self.ns, self.tweetsHash)
+		self.nGramsWithFavsMinusMean, self.nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(self.ns, self.tweetsHash)#loadnGramsWithFavsMinusMeanMedian(self.ns, self.tweetsHash)
 		self.sourceMeanMedianInternalVars()
 
 		print("sourced in : ",time.time()-t)
@@ -401,22 +444,16 @@ class MixedBoostingBayesClassifier():
 		ax2.legend()
 		plt.show()
 
-	def selectRandomBatch(self, sourceTweets, batchSize):
-		indices = np.random.permutation(len(sourceTweets))
-		batchIndices = indices[:batchSize]
-		batch = []
-		for i in batchIndices:
-			batch.append(sourceTweets[i])
-		return batch;
 
-	def train(self, trainingTweets,testData = None, epochs = 40,retabulate = False):
+
+	def train(self, trainingTweets,testData = None, epochs = 1,retabulate = False):
 		'''
 		:param trainingTweets: [(favCount, cleanedText, allCapsRatio),...]
 		:return:
 		'''
 		self.trainingTweets = trainingTweets
 		self.trainingTweetsFavsAndCleanedText = [tweet[0:2] for tweet in trainingTweets];
-		self.tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(self.ns,self.trainingTweetsFavsAndCleanedText,retabulate);
+		self.tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(self.ns, self.trainingTweetsFavsAndCleanedText, retabulate);
 		self.sourceNgramsForCurrentSavedSelfNsTweetsHash()
 
 		'''
@@ -434,7 +471,7 @@ class MixedBoostingBayesClassifier():
 			totalGuesses = 0;
 			print(Fore.LIGHTGREEN_EX,"beginning epoch: ",e,Style.RESET_ALL);
 
-			batch = self.selectRandomBatch(self.trainingTweets, batchSize = len(self.trainingTweets));
+			batch = selectRandomBatch(self.trainingTweets, batchSize = len(self.trainingTweets));
 			for tweet in batch:
 				realFavCount = tweet[0]
 				cleanedText = tweet[1]
@@ -742,4 +779,260 @@ class MixedBoostingBayesClassifier():
 
 		self.m,self.c = ols(xMatrix,yMatrix)
 
+
+
+
+class MixedBoostingBayesClassifierPercentile():
+	def __init__(self, percentile):
+
+		self.percentile = percentile;
+		self.learningRate = 0.0005;
+
+	def plotMedianDistribution(self):
+		ax1= plt.subplot(2,1,1)
+		ax2 = plt.subplot(2, 1, 2)
+		ax1.scatter(list(range(len(self.distancesMedian))),[d for d in self.distancesMedian]);
+		ax2.scatter(list(range(len(self.distancesMedian))), [np.sign(d)*np.log(np.fabs(d)) for d in self.distancesMedian]);
+		ax1.plot([0,len(self.distancesMedian)],[0,0])
+		ax2.plot([0, len(self.distancesMedian)], [0, 0])
+		print(len([x for x in self.distancesMedian if x >= 0]) / len(self.distancesMedian))
+		plt.show()
+
+
+
+	def sourcePercentileInternalVars(self):
+
+		self.nGramsWithFavsMinusMedianDict = {}
+
+		distancesMedian = [np.fabs(nGram[nGramStorageIndicesSkew["skew"]]) for nGram in self.nGramsWithFavsMinusMedian]
+		self.distancesMedian = [nGram[nGramStorageIndicesSkew["skew"]] for nGram in self.nGramsWithFavsMinusMedian]
+
+		self.avgMedianSkew = np.mean(distancesMedian)
+		self.nGramMedianWeights = {}
+
+		for nGram in self.nGramsWithFavsMinusMedian:
+			self.nGramsWithFavsMinusMedianDict[nGram[0]] = nGram
+			self.nGramMedianWeights[nGram[0]] =10000/(nGram[nGramStorageIndicesSkew["count"]]*(nGram[nGramStorageIndicesSkew["std"]]));# nGram[nGramStorageIndices["skew"]]/self.avgMedianSkew;
+			# if nGram[nGramStorageIndicesSkew["skew"]] > 0:
+			# 	self.nGramMedianWeights[nGram[0]] *= 1000000;
+
+
+
+
+		appearancesForEachNGram = [int(nGram[nGramStorageIndicesSkew["count"]]) for nGram in self.nGramsWithFavsMinusMedian]
+		self.medianAppearances = np.median(appearancesForEachNGram)
+
+
+	def sourceNgramsForCurrentSavedSelfNsTweetsHash(self):
+		t = time.time()
+
+		self.nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusPercentile(self.ns, self.tweetsHash,self.percentile)#loadnGramsWithFavsMinusMeanMedian(self.ns, self.tweetsHash)
+		summer = 0;
+		for nGram in self.nGramsWithFavsMinusMedian:
+			if nGram[nGramStorageIndicesSkew["skew"]] not in [-1.0,1.0]:
+				print(nGram);
+			summer += nGram[nGramStorageIndicesSkew["skew"]]
+		print("summer: ",summer/len(self.nGramsWithFavsMinusMedian));
+		self.sourcePercentileInternalVars()
+
+		print("sourced in : ",time.time()-t)
+
+		self.medianFavCount = getMedianFavCountPresTweets(self.trainingTweets, percentile = self.percentile)
+
+		print(" median favs: ",self.medianFavCount);
+
+	def displayPredictionResults(self, title,sample = True):
+
+
+		maxIndex = np.iinfo(int).max
+		if sample:
+			maxIndex = 10;
+
+
+		dataFrameDict = {}
+		dataFrameDict["tweets"] = self.seenTweets[:maxIndex];
+		dataFrameDict["guessed score median"] = self.guessedScoresMedian[:maxIndex]
+		dataFrameDict["guessed score median"] = self.correctnessMedian[:maxIndex]
+		df = pd.DataFrame(dataFrameDict)
+		print(df)
+		medianSuccess = sum(self.correctnessMedian)/len(self.correctnessMedian);
+		print("median success: ",medianSuccess)
+		print("medians success word count: ", np.mean(self.lensSuccessMedians), " and failure word count: ",
+			  np.mean(self.lensFailureMedians))
+		print("percentage of positive median guesses: ",self.positiveMedianGuesses/len(self.seenTweets),"; mean guesses: ",self.positiveMeanGuesses/len(self.seenTweets))
+
+		print("average median score: ",np.mean(self.guessedScoresMedian), " ||", len(self.guessedScoresMedian))
+		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+		fig.subplots_adjust(left=0.06, right=0.94)
+		ax2 = plt.subplot(1,1,1)
+
+		ax2.title.set_text("medians: "+title +"  " + str(medianSuccess));
+
+		ax2.scatter([tup[0] for tup in self.successScoresMedian], [tup[1] for tup in self.successScoresMedian],label="successes", color="red")
+		ax2.scatter([tup[0] for tup in self.failureScoresMedian], [tup[1] for tup in self.failureScoresMedian],label="failures", color="blue")
+		ax2.plot([self.medianFavCount, self.medianFavCount], [-1*max([tup[1] for tup in self.successScoresMedian]),max([tup[1] for tup in self.successScoresMedian])], color="blue")
+
+		ax2.set_xlim([0, 200000])
+		ax2.plot([0, 200000], [0, 0],color="cyan")
+		ax2.legend()
+		plt.show()
+
+
+
+	def train(self, trainingTweets,testData = None, epochs = 1,retabulate = False):
+		'''
+		:param trainingTweets: [(favCount, cleanedText, allCapsRatio),...]
+		:return:
+		'''
+		print("origlen: ",len(trainingTweets));
+		trainingTweets.sort(key=lambda tup: tup[0]);
+		percentileCountIndex = int(len(trainingTweets) * self.percentile);
+		percentileCount = trainingTweets[percentileCountIndex][0];
+		onlyEnds = False;
+		if onlyEnds:
+
+
+			trainingTweetsUpper = trainingTweets[percentileCountIndex:]
+			trainingTweetsLower = trainingTweets[:len(trainingTweets) - percentileCountIndex];
+
+			self.trainingTweets = trainingTweetsUpper + trainingTweetsLower;
+			trainingTweets = self.trainingTweets;
+
+			aboveThreshhold = [tweet for tweet in trainingTweets if tweet[0] >= percentileCount];
+			below = [tweet for tweet in trainingTweets if tweet[0] < percentileCount];
+			aboveThreshholdFC = [t[0] for t in aboveThreshhold]
+			belowThreshholdFC = [t[0] for t in below]
+			maxes = [min(belowThreshholdFC), max(belowThreshholdFC), min(aboveThreshholdFC), max(aboveThreshholdFC)]
+			for n in [1, 2, 3, 4]:
+				computeMostCommonnGrams(aboveThreshhold, n)
+				computeMostCommonnGrams(below, n)
+				hasher = hashTweets(aboveThreshhold);
+				nGramsAbove = getnGramsWithOverMOccurences(n, 3, hashTweets([tweet[0:2] for tweet in aboveThreshhold]));
+				nGramsBelow = getnGramsWithOverMOccurences(n, 3, hashTweets([tweet[0:2] for tweet in below]));
+				lenGrams = [len(nGramsAbove), len(nGramsBelow)];
+			print("postlen: ", len(trainingTweets));
+		else:
+			self.trainingTweets = trainingTweets;
+
+		self.ns = [1,2,3,4]
+		self.trainingTweetsFavsAndCleanedText = [tweet[0:2] for tweet in trainingTweets];
+
+		self.tweetsHash = calculateAndStorenGramsWithFavsMinusPercentile(self.ns, self.trainingTweetsFavsAndCleanedText,self.percentile,percentileCount=percentileCount,retabulate=retabulate);
+		self.sourceNgramsForCurrentSavedSelfNsTweetsHash()
+
+		'''
+		compute median medianScore 
+		'''
+		self.meanBias = 0;
+		self.medianBias = 0;
+		for e in range(epochs):
+			medianScores = []
+			validCounter = 0;
+			totalSuccesses = 0;
+			totalFailures = 0;
+			totalGuesses = 0;
+			print(Fore.LIGHTGREEN_EX,"beginning epoch: ",e,Style.RESET_ALL);
+
+			batch = selectRandomBatch(self.trainingTweets, batchSize = len(self.trainingTweets));
+			for tweet in batch:
+				realFavCount = tweet[0]
+				cleanedText = tweet[1]
+				if len(tweet[1])> 2:
+					medianScore, numGramsUsed = self.predict(cleanedText)
+
+					medianSuccess = int(medianScore * (realFavCount - self.medianFavCount) > 0)
+					if not medianSuccess:
+						totalFailures += 1;
+					else:
+						totalSuccesses += 1;
+					totalGuesses += 1;
+					medianScores.append(medianScore)
+					validCounter += 1
+			if e == 0:
+
+				self.medianBias = np.median(medianScores)
+			self.learningRate *= 0.99
+			wouldBeBias = np.mean(medianScores);
+
+			print("epoch ",e," finished; training accuracy: ",totalSuccesses/totalGuesses,"training inaccuracy: ",totalFailures/totalGuesses," median score: ", wouldBeBias)
+
+			# self.test(testData,title="epoch: "+str(e));
+
+	def test(self, testTweets,title=""):
+
+
+		self.seenTweets = []
+		self.guessedScoresMedian = []
+		self.correctnessMedian = []
+		self.lensSuccessMedians = []
+		self.lensFailureMedians = []
+
+		self.successScoresMedian = []
+		self.failureScoresMedian = []
+		self.positiveMedianGuesses = 0;
+		self.positiveMeanGuesses = 0;
+		self.actuallyPositiveTweetsMedian = 0;
+
+		misClassifiedTweetsMedian = []
+
+
+		for tweet in testTweets:
+
+			realFavCount = tweet[0]
+			cleanedText = tweet[1]
+			allCapsRatio = tweet[2]
+			mediaType = tweet[3]
+
+			if len(cleanedText) > 2:
+				medianScore, numberOfAcceptedGrams = self.predict(cleanedText)
+
+				if numberOfAcceptedGrams == 0:
+					continue;
+				self.seenTweets.append(cleanedText)
+				self.guessedScoresMedian.append(round(medianScore, 2))
+				self.positiveMedianGuesses += int(medianScore>0)
+				self.actuallyPositiveTweetsMedian += int(realFavCount > self.medianFavCount)
+				medianSuccess = int(medianScore * (realFavCount - self.medianFavCount) > 0)
+
+				self.correctnessMedian.append(medianSuccess)
+
+
+				if medianSuccess:
+					self.lensSuccessMedians.append(numberOfAcceptedGrams)
+					self.successScoresMedian.append((realFavCount,medianScore))
+				else:
+					self.lensFailureMedians.append(numberOfAcceptedGrams)
+					self.failureScoresMedian.append((realFavCount,medianScore))
+					misClassifiedTweetsMedian.append(tweet)
+
+
+		self.displayPredictionResults(title=title)
+		return [misClassifiedTweetsMedian]
+
+	def predict(self, cleanedText):
+
+		if "aap" in cleanedText:
+			print("aap")
+
+		nGrams = extractNGramsFromCleanedText(cleanedText, self.ns);
+
+		medianScore = 0;
+		numberOfAcceptedGrams = 0;
+		for nGram in nGrams:
+			if nGram in self.nGramMedianWeights:
+				numberOfAcceptedGrams += 1
+				myGram = self.nGramsWithFavsMinusMedianDict[nGram];
+				myGramSkew = myGram[nGramStorageIndicesSkew["skew"]];
+				myWeight = self.nGramMedianWeights[nGram];
+				# medianScore += myGramSkew * myWeight;
+				medianScore += myGramSkew
+
+
+			continue
+
+		
+		# medianScore -= self.medianBias
+
+		# print(self.medianBias)
+		return medianScore, numberOfAcceptedGrams
 

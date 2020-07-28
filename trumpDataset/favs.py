@@ -7,11 +7,13 @@ from .stats import pearsonCorrelationCoefficient
 from .visualization import boxAndWhiskerForKeyWordsFavs, computeXandYForPlotting,graphTwoDataSetsTogether;
 
 
-def getMedianFavCountPresTweets(favs = None):
+def getMedianFavCountPresTweets(favs = None, percentile = -1):
 	if favs == None:
 		favs = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount")
 	favs.sort(key=lambda tup: tup[0])
-	median = favs[int(len(favs)/2)][0];
+	if percentile == -1:
+		percentile = 0.5
+	median = favs[int(len(favs)*percentile)][0];
 	return median
 
 
@@ -34,19 +36,42 @@ def loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash):
 	:param tweetsHash:
 	:return: [(n-gram count, skew, stdev, favs),...]
 	'''
-	wordsAndBigramsWithFavsMinusMeanFile = open(
-		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMean" + tweetsHash + ".p", "rb")
-	nGramsWithFavsMinusMean = pickle.load(wordsAndBigramsWithFavsMinusMeanFile);
-	wordsAndBigramsWithFavsMinusMeanFile.close()
 
-	wordsAndBigramsWithFavsMinusMedianFile = open(
+
+	nGramsWithFavsMinusMeanFile = open(
+		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMean" + tweetsHash + ".p", "rb")
+	nGramsWithFavsMinusMean = pickle.load(nGramsWithFavsMinusMeanFile);
+	nGramsWithFavsMinusMeanFile.close()
+
+	nGramsWithFavsMinusMedianFile = open(
 		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMedian" + tweetsHash + ".p", "rb")
-	nGramsWithFavsMinusMedian = pickle.load(wordsAndBigramsWithFavsMinusMedianFile);
-	wordsAndBigramsWithFavsMinusMedianFile.close()
+	nGramsWithFavsMinusMedian = pickle.load(nGramsWithFavsMinusMedianFile);
+	nGramsWithFavsMinusMedianFile.close()
+
+
 
 	return nGramsWithFavsMinusMean,nGramsWithFavsMinusMedian
 
-def loadnGramsWithFavsProbabilities(ns,numBins, tweetsHash):
+
+def loadnGramsWithFavsMinusPercentile(ns, tweetsHash,percentile):
+	'''
+
+	:param ns:
+	:param tweetsHash:
+	:return: [(n-gram count, skew, stdev, favs),...]
+	'''
+	nGramsWithFavsMinusMedianPercentileFile = open(
+		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusPercentile"+str(percentile) + tweetsHash + ".p", "rb")
+	nGramsWithFavsMinusPercentileMedian = pickle.load(nGramsWithFavsMinusMedianPercentileFile);
+	nGramsWithFavsMinusMedianPercentileFile.close()
+
+
+
+
+
+	return nGramsWithFavsMinusPercentileMedian
+
+def loadnGramsWithFavsProbabilities(ns,numBins, tweetsHash,percentile):
 	'''
 
 	:param ns:
@@ -54,7 +79,7 @@ def loadnGramsWithFavsProbabilities(ns,numBins, tweetsHash):
 	:return: [(n-gram count, skew, stdev, favs),...]
 	'''
 	wordsAndBigramsWithFavsProbabilitiesFile = open(
-		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities" +str(numBins)+ tweetsHash + ".p", "rb")
+		"trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities"+str(percentile) +str(numBins)+ tweetsHash + ".p", "rb")
 	nGramsWithFavsProbabilities = pickle.load(wordsAndBigramsWithFavsProbabilitiesFile);
 	wordsAndBigramsWithFavsProbabilitiesFile.close()
 
@@ -62,7 +87,7 @@ def loadnGramsWithFavsProbabilities(ns,numBins, tweetsHash):
 	return nGramsWithFavsProbabilities
 
 
-def calculateAndStorenGramsFavsProbabilities(ns,tweets,numBins=2, retabulate = False):
+def calculateAndStorenGramsFavsProbabilities(ns,tweets,percentile = 0.5,numBins=2, retabulate = False):
 	'''
 	calculates, for each ngram, P(bin_i | nGram)
 	:param ns:
@@ -77,7 +102,7 @@ def calculateAndStorenGramsFavsProbabilities(ns,tweets,numBins=2, retabulate = F
 
 	if not retabulate:
 		try:
-			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities" +str(numBins)+ tweetsHash + ".p",'rb');
+			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities" +str(percentile)+str(numBins)+ tweetsHash + ".p",'rb');
 			f.close()
 			print("not retabulating bin probabilities; run again with retabulate = True to retabulate")
 			return tweetsHash
@@ -87,7 +112,7 @@ def calculateAndStorenGramsFavsProbabilities(ns,tweets,numBins=2, retabulate = F
 
 
 	startingTime = time.time()
-	fvcMedian = getMedianFavCountPresTweets(tweets)
+	fvcMedian = getMedianFavCountPresTweets(tweets,percentile = percentile)
 
 	nGrams = []
 
@@ -114,19 +139,28 @@ def calculateAndStorenGramsFavsProbabilities(ns,tweets,numBins=2, retabulate = F
 			raise Exception("not implemented yet lol")
 		nGrams = extractNGramsFromCleanedText(cleanedText, ns);
 		for nGram in nGrams:
+
 			if nGram in nGramsWithBinProbs:
 				nGramsWithBinProbs[nGram][bin] += 1
 				totalNGramsProbs[bin] += 1;
 		if index % 100 == 0:
 			print(Fore.RED, index / len(tweets), Style.RESET_ALL)
+	for nGram in nGramsWithBinProbs:
+		if nGramsWithBinProbs[nGram][0] == 0:
+			nGramsWithBinProbs[nGram][0] = 1./nGramsWithBinProbs[nGram][1]
+		elif nGramsWithBinProbs[nGram][1] == 0:
+			nGramsWithBinProbs[nGram][1] = 1. / nGramsWithBinProbs[nGram][0]
 
 	print("ratio positive: ",positives/totals)
 	for bin in range(numBins):
 		for nGram in nGramsWithBinProbs.keys():
-			nGramsWithBinProbs[nGram][bin] /= totalNGramsProbs[bin]
+			if bin == 0:
+				nGramsWithBinProbs[nGram][bin] /= 1-(positives/totals);
+			else:
+				nGramsWithBinProbs[nGram][bin] /= positives / totals;
 
 
-	with open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities" +str(numBins)+ tweetsHash + ".p",
+	with open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsProbabilities"+str(percentile) +str(numBins)+ tweetsHash + ".p",
 			  'wb') as wordsAndBigramsWithFavsMinusMeanFile:
 		pickle.dump(nGramsWithBinProbs, wordsAndBigramsWithFavsMinusMeanFile)
 		wordsAndBigramsWithFavsMinusMeanFile.close()
@@ -137,7 +171,8 @@ def calculateAndStorenGramsFavsProbabilities(ns,tweets,numBins=2, retabulate = F
 def updateFavCounts():
 	updateFormula = "UPDATE "+mainTable+" SET favCount = %s WHERE id = %s";
 
-	tweets = getTweetsFromDB(n=-1,purePres=False,conditions=[],returnParams=["id","favCount"]);
+	tweets = getTweetsFromDB(n=-1,purePres=False,conditions=[],returnParams=["id","favCount"], orderBy="publishTime desc");
+	tweets = tweets[:1000]
 
 	counter = 0;
 	diffs=[]
@@ -165,7 +200,7 @@ def updateFavCounts():
 			diffs.append((str(id),str(newFavCount),"diff: ",newFavCount-prevFavCount));
 			tuples.append((str(id),str(newFavCount)));
 		counter += 1;
-
+	diffs.sort(key = lambda tup: tup[-1]);
 	for diff in diffs:
 		print(diff);
 	plt.scatter(list(range(len(oldDiffs))),oldDiffs)
@@ -179,14 +214,81 @@ def updateFavCounts():
 
 
 
-def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False):
+def calculateAndStorenGramsWithFavsMinusPercentile(ns, tweets, percentile,percentileCount = -1, retabulate = False):
+	tweetsHash = hashTweets(tweets);
+	tweets.sort(key=lambda t: t[0]);
+
+	
+
+	favCounts = [t[0] for t in tweets];
+
+
+
+	if percentileCount == -1:
+		percentileCount = favCounts[int(len(favCounts)*percentile)];
+
+
+	if not retabulate:
+		try:
+			# newFileName = str(ns) + "gramsWithFavsMinusPercentile"+str(percentile) + tweetsHash + ".p";
+			# oldFileName = str(ns) + "gramsWithFavsMinusPercentile"+str(percentileCount) + tweetsHash + ".p";
+			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusPercentile"+str(percentile) + tweetsHash + ".p",'rb');
+			f.close()
+			print("not retabulating percentile skews; run again with retabulate = True to retabulate")
+			return tweetsHash
+		except:
+			pass
+	print(Fore.MAGENTA,"retabulating percentile skews " , len(tweets),Style.RESET_ALL)
+
+
+	startingTime = time.time()
+	# fvcMean = getMeanFavCountPresTweets(tweets)
+	# fvcMedian = getMedianFavCountPresTweets(tweets)
+
+	nGrams = []
+	for n in ns:
+		computeMostCommonnGrams(tweets, n);
+		myNGrams = getnGramsWithOverMOccurences(n, 5, tweetsHash)
+		nGrams.extend(myNGrams)
+	favsList = []
+	keywords = []
+
+	nGramsWithFavsMinusPercentile = []
+
+	for index, nGram in enumerate(nGrams):
+		favs = getFavsByNGram(nGram[0],tweets);
+		medianFavs = favs[int(len(favs) / 2)]
+
+		# medianFavs = favs[int(len(favs) / 2)]
+		###not the same length because the source words contain rts and also possiblty multiple counts per tweet
+		favsList.append(favs);
+		keywords.append(nGram[0]);
+		favsAbovePercentileCount = [fav for fav in favs if fav > percentileCount];
+		percentageAbovePercentile = (len(favsAbovePercentileCount)/len(favs))*2-1;
+		nGramsWithFavsMinusPercentile.append((nGram[0], nGram[1], np.std(favs), percentageAbovePercentile, favs));
+		if index % 100 == 0:
+			print(Fore.RED, index / len(nGrams), Style.RESET_ALL)
+
+
+	print("percent skews above median: ", len([x for x in nGramsWithFavsMinusPercentile if x[nGramStorageIndicesSkew["skew"]] >= 0]) / len(nGramsWithFavsMinusPercentile))
+
+	nGramsWithFavsMinusPercentile.sort(key=lambda tup: np.fabs(tup[nGramStorageIndicesSkew["skew"]]), reverse=True)
+
+	with open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusPercentile"+str(percentile) + tweetsHash + ".p",
+			  'wb') as wordsAndBigramsWithFavsMinusMedianFile:
+		pickle.dump(nGramsWithFavsMinusPercentile, wordsAndBigramsWithFavsMinusMedianFile)
+		wordsAndBigramsWithFavsMinusMedianFile.close()
+	print(Fore.MAGENTA, time.time() - startingTime, Style.RESET_ALL);
+	return tweetsHash
+
+def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False,minCount=5):
 	tweetsHash = hashTweets(tweets);
 
 	if not retabulate:
 		try:
 			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMean" + tweetsHash + ".p",'rb');
 			f.close()
-			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMean" + tweetsHash + ".p", 'rb');
+			f=open("trumpBA/trumpDataset/npStores/" + str(ns) + "gramsWithFavsMinusMedian" + tweetsHash + ".p", 'rb');
 			f.close()
 			print("not retabulating mean/median skews; run again with retabulate = True to retabulate")
 			return tweetsHash
@@ -202,7 +304,7 @@ def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False
 	nGrams = []
 	for n in ns:
 		computeMostCommonnGrams(tweets, n);
-		myNGrams = getnGramsWithOverMOccurences(n, 5, tweetsHash)
+		myNGrams = getnGramsWithOverMOccurences(n, minCount, tweetsHash)
 		nGrams.extend(myNGrams)
 	favsList = []
 	keywords = []
@@ -211,8 +313,18 @@ def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False
 	nGramsWithFavsMinusMedian = []
 
 	for index, nGram in enumerate(nGrams):
-		favs = getFavsByNGram(nGram[0], rts=False);
-		medianFavs = favs[int(len(favs) / 2)]
+		favs = getFavsByNGram(nGram[0],tweets);
+		try:
+			medianFavs = favs[int(len(favs) / 2)]
+		except:
+			print("fuck!!!!\n\n\n")
+			print(nGram)
+			print(favs)
+			continue;
+
+
+
+
 		meanFavs = np.mean(favs)
 		###not the same length because the source words contain rts and also possiblty multiple counts per tweet
 		favsList.append(favs);
@@ -221,7 +333,7 @@ def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False
 		# nGramsWithFavsMinusMeanDict[nGram[0]] = (str(nGram[1]), meanFavs - fvcMean,favs);
 		nGramsWithFavsMinusMedian.append((nGram[0], nGram[1], np.std(favs), medianFavs - fvcMedian, favs));
 		# nGramsWithFavsMinusMedianDict[nGram[0]] = (str(nGram[1]), medianFavs - fvcMedian, favs);
-		if index % 100 == 0:
+		if index % 1000 == 0:
 			print(Fore.RED, index / len(nGrams), Style.RESET_ALL)
 
 	print("collected: ", len(nGramsWithFavsMinusMean), " grams!")
@@ -282,6 +394,55 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 	boxAndWhiskerForKeyWordsFavs(meanXs,meanYs , fvcMean, title="meansDifference")
 	boxAndWhiskerForKeyWordsFavs(medianXs, medianYs, fvcMedian, title="mediansDifference")
 
+def normalizeTweetsFavCountsFixedWindowStrategy(tweets,daysPerMonth, determinator = "mean"):
+
+	tweets.sort(key = lambda t: t[4]);
+	regFuncs = {"mean":np.mean,"median":np.median};
+	regFunc = regFuncs[determinator];
+
+	elapsedDaysTotal = (tweets[-1][4]-tweets[0][4]).days
+	numYears = int(elapsedDaysTotal/daysPerMonth)
+	tweetsByYear = splitTweetsByYear(tweets,numYears)
+	#goal: for each year, np.mean(year) is equal
+	normForEachYear = regFunc([t[0] for t in tweetsByYear[0]])
+
+	for year in tweetsByYear[1:]:
+		thisMean = regFunc([t[0] for t in year])
+		meanDifference = thisMean-normForEachYear;
+		#if meanDifference > 0 then more popular than usual => bring down; else bring up
+		for i in range(len(year)):
+			year[i] = (year[i][0]-meanDifference,) + year[i][1:]
+		# print("post: ", regFunc([t[0] for t in year]),normForEachYear);
+
+	return flattenFolds(tweetsByYear,-1);
+
+def normalizeTweetsFavCountsSlidingWindowStrategy(tweets,daysPerMonth, determinator = "mean"):
+
+	tweets = tweets.copy();
+	tweets.sort(key = lambda t: t[4]);
+	regFuncs = {"mean":np.mean,"median":np.median};
+	regFunc = regFuncs[determinator];
+
+
+	favWindow = [t[0] for t in tweets[:int(daysPerMonth/2)]];
+	nextTweetToAddIndex = int(daysPerMonth/2);
+	favWindow = [0]*(daysPerMonth-len(favWindow))+favWindow
+	for i in range(len(tweets)):
+		meanWindow = regFunc(favWindow);
+		# print('mw',meanWindow);
+		# print("pre: ",tweets[i][0]);
+		tweets[i] = (tweets[i][0]-meanWindow,) + tweets[i][1:]
+		if len(favWindow) == daysPerMonth:
+			favWindow.remove(favWindow[0]);
+		try:
+			favWindow.append(tweets[nextTweetToAddIndex][0]);
+		except:
+			pass
+		nextTweetToAddIndex += 1;
+		# print("post: ", tweets[i][0]);
+
+
+	return tweets;
 
 
 def favouriteVsLengthTrends():
@@ -469,9 +630,45 @@ def graphPearsonsForApprFavOffset():
 	plt.title("correlation coefficients for approval rating and favCount, offset by variable number of days")
 	plt.show()
 
-def graphFavCount():
-	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
+def graphFavCount(tweets = None, title=""):
+
+	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+	fig.subplots_adjust(left=0.06, right=0.94)
+	if tweets == None:
+		tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
+	favCounts = [t[0] for t in tweets];
 	plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
+	for i in [50000,100000,150000,200000]:
+		plt.plot([0,len(tweets)],[i,i]);
+	plt.plot([int(len(tweets)*0.75),int(len(tweets)*0.75)],[0,max(favCounts)]);
+	pearson = pearsonCorrelationCoefficient(favCounts, [i for i in range(len(favCounts))]);
+	plt.title("FavCount for all presidential tweets; pearson : "+str(pearson)+"; " + title);
+
+	plt.show();
+
+def graphFavCountAndDerivative():
+	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
+	favCounts = [t[0] for t in tweets];
+	derivatives = []
+	for i in range(20,len(favCounts)-20):
+		derivative = (np.mean(favCounts[i+1:i+21])-np.mean(favCounts[i-20:i]))/2
+		# derivative = (favCounts[i+1]-favCounts[i-1])/2
+		derivatives.append(derivative);
+	# derivatives.insert(0,derivatives[0]);
+	# derivatives.append(derivatives[-1]);
+	# graphTwoDataSetsTogether(favCounts,"favCounts",derivatives,"derivatives",title="favCounts vs derivatives")
+	# return;
+	medianDerivative = np.median(derivatives);
+
+	plt.scatter([i for i in range(len(derivatives))],derivatives,s=[0.1]*len(derivatives));
+	plt.plot([0, len(derivatives)], [medianDerivative, medianDerivative])
+	plt.plot([int(len(derivatives) * 0.75), int(len(derivatives) * 0.75)], [0, max(derivatives)]);
+	plt.ylim(0, 500);
+	plt.show();
+
+	plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
+	for i in [50000,100000,150000,200000]:
+		plt.plot([0,len(tweets)],[i,i]);
 	plt.title("FavCount for all presidential tweets")
 	plt.show();
 

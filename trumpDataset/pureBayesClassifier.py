@@ -1,6 +1,6 @@
 from .stats import ols
 from .favs import getMedianFavCountPresTweets, getMeanFavCountPresTweets, \
-	calculateAndStorenGramsFavsProbabilities, loadnGramsWithFavsProbabilities
+	calculateAndStorenGramsFavsProbabilities, loadnGramsWithFavsProbabilities, loadnGramsWithFavsMinusPercentile, calculateAndStorenGramsWithFavsMinusPercentile
 from .part3funcs import extractNGramsFromCleanedText, getnGramsWithOverMOccurences
 from .media import removeMediaFromTweet
 from .basisFuncs import *
@@ -11,7 +11,7 @@ from .visualization import graphTwoDataSetsTogether;
 
 
 class PureBayesClassifier():
-	def __init__(self, ns = [1,2,3,4],numBins = 2):
+	def __init__(self, ns = [1,2,3,4],percentile = 0.5,numBins = 2):
 		'''
 		TODO: make good documentation of this!
 		TODO: probability = inverse numTokens?
@@ -30,20 +30,21 @@ class PureBayesClassifier():
 
 		self.ns = ns;
 		self.numBins = 2;
+		self.percentile = percentile;
 
 
 
 	def sourceNgramsForCurrentSavedSelfNsTweetsHash(self):
 
-		self.nGramsWithBinProbabilitiesDict = loadnGramsWithFavsProbabilities(self.ns,self.numBins, self.tweetsHash)
+		self.nGramsWithBinProbabilitiesDict = loadnGramsWithFavsProbabilities(self.ns,self.numBins, self.tweetsHash,self.percentile)
 
 
-		self.medianFavCount = getMedianFavCountPresTweets(self.trainingTweets)
+		self.medianFavCount = getMedianFavCountPresTweets(self.trainingTweets,self.percentile)
 		self.meanFavCount = getMeanFavCountPresTweets(self.trainingTweets)
 
 		print("mean favs: ",self.meanFavCount," median favs: ",self.medianFavCount);
 
-	def displayPredictionResults(self,sample = True):
+	def displayPredictionResults(self,title = "",sample = True):
 
 
 		print("success rate: ",self.successRate)
@@ -53,7 +54,7 @@ class PureBayesClassifier():
 		ax1 = plt.subplot(1,1,1)
 		# ax2 = plt.subplot(2,1,2)
 
-		ax1.title.set_text("Naive Bayes Success Rate: " + str(self.successRate))
+		ax1.title.set_text("Naive Bayes Success Rate: " + str(self.successRate) + title)
 		ax1.scatter([tup[0] for tup in self.successScores], [tup[1] for tup in self.successScores], label="successes", color="red")
 		ax1.scatter([tup[0] for tup in self.failureScores], [tup[1] for tup in self.failureScores], label= "failures",color="blue")
 
@@ -88,9 +89,16 @@ class PureBayesClassifier():
 		:param trainingTweets: [(favCount, cleanedText, allCapsRatio),...]
 		:return:
 		'''
-		self.trainingTweets = trainingTweets
+		percentileCountIndex = int(len(trainingTweets) * self.percentile);
+		trainingTweetsUpper = trainingTweets[percentileCountIndex:]
+		trainingTweetsLower = trainingTweets[:len(trainingTweets) - percentileCountIndex];
+
+		self.trainingTweets = trainingTweetsUpper + trainingTweetsLower;
+		# self.trainingTweets = trainingTweets
+
+
 		self.trainingTweetsFavsAndCleanedText = [tweet[0:2] for tweet in trainingTweets];
-		self.tweetsHash = calculateAndStorenGramsFavsProbabilities(self.ns,self.trainingTweetsFavsAndCleanedText,self.numBins,retabulate);
+		self.tweetsHash = calculateAndStorenGramsFavsProbabilities(self.ns,self.trainingTweetsFavsAndCleanedText,numBins=self.numBins,retabulate=True,percentile=self.percentile);
 		self.sourceNgramsForCurrentSavedSelfNsTweetsHash()
 
 
@@ -111,6 +119,9 @@ class PureBayesClassifier():
 		totalGuesses = 0;
 		totalCorrect = 0;
 
+		correctByBin = {-1:0,1:0}
+		totalByBin = {-1:0,1:0}
+
 
 		for tweet in testTweets:
 
@@ -123,10 +134,12 @@ class PureBayesClassifier():
 					continue;
 
 				success = int(prediction * (realFavCount - self.medianFavCount) > 0)
+
 				totalCorrect += success;
 
 				if success:
 					self.successScores.append((realFavCount,confidence))
+					correctByBin[prediction] += 1;
 					try:
 						self.numberOfGramsSuccessRates[numberOfAcceptedGrams][0] += 1
 					except:
@@ -134,6 +147,7 @@ class PureBayesClassifier():
 				else:
 					self.failureScores.append((realFavCount,confidence));
 					misClassifiedTweetsNaive.append(tweet);
+				totalByBin[prediction] += 1;
 
 				try:
 					self.numberOfGramsSuccessRates[numberOfAcceptedGrams][1] += 1
@@ -143,8 +157,13 @@ class PureBayesClassifier():
 
 			totalGuesses += 1;
 
+
+		# self.successRate = 0;
+		# for bin in totalByBin.keys():
+		# 	self.successRate += correctByBin[bin]/totalByBin[bin]
+		# self.successRate /= len(totalByBin);
 		self.successRate = totalCorrect/totalGuesses;
-		self.displayPredictionResults()
+		self.displayPredictionResults(title=title)
 		return [misClassifiedTweetsNaive]
 
 	def predict(self, cleanedText, lowerLimitAccGram = 0, upperLimitAccGram = 100000):
@@ -172,43 +191,28 @@ class PureBayesClassifier():
 				numberOfAcceptedGrams += 1
 				myGramBinsProbs = self.nGramsWithBinProbabilitiesDict[nGram];
 				for bin, prob in enumerate(myGramBinsProbs):
+					if prob == 0:
+						print("woah!");
 					probsClasses[bin] *= prob;
+
+					if probsClasses[bin] < (1./np.power(10,5)):
+						for binnie in range(len(myGramBinsProbs)):
+							probsClasses[binnie] *= 10;
+					
 		# if not lowerLimitAccGram <= numberOfAcceptedGrams <= upperLimitAccGram:
 		# 	return 404,404
+		origProbsClasses = probsClasses.copy();
 		maxBin = np.argmax(probsClasses)
 		probMaxBin = probsClasses[maxBin];
 		probsClasses.remove(probMaxBin);
 		if maxBin == 0:
 			maxBin = -1;
 
-
+		if probMaxBin < 0.01:
+			print(probMaxBin);
 		if probMaxBin > 0.01:
 			print(cleanedText,probMaxBin)
 		return maxBin, probMaxBin, numberOfAcceptedGrams#/(np.sum(probsClasses)/len(probsClasses))
 
 
-	def regression(self):
-
-
-		vocab = []
-		for n in self.ns:
-			myGrams = getnGramsWithOverMOccurences(n,1,self.tweetsHash)
-			for grm in myGrams:
-				vocab.append((grm[0]))
-		print(len(vocab))
-
-		xMatrix = np.zeros((len(vocab),len(self.cleanTexts)))
-		yMatrix = np.zeros((len(self.cleanTexts)))
-		for ctIndex, ct in enumerate(self.cleanTexts):
-			myGrams = extractNGramsFromCleanedText(ct,self.ns);
-			myVector = np.zeros((len(vocab)))
-			for index,v in enumerate(vocab):
-				myVector[index] = myGrams.count(v);
-			yMatrix[ctIndex] = self.favs[ctIndex]
-			xMatrix[:,ctIndex] = myVector
-
-			if ctIndex%100 == 0:
-				print(ctIndex/len(self.cleanTexts))
-
-		self.m,self.c = ols(xMatrix,yMatrix)
 

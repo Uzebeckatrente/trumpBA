@@ -20,7 +20,9 @@ def zScore(favs, fav):
 
 
 def ols(x, y):
-	vec1WithConstant = np.ones(x.shape[0], 2);
+	x = np.array(x);
+	y = np.array(y);
+	vec1WithConstant = np.ones((x.shape[0], 2));
 	vec1WithConstant[:, 0] = x
 	x = vec1WithConstant;
 	m,c = np.linalg.lstsq(x, y, rcond=None)[0]
