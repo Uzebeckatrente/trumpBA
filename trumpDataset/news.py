@@ -6,7 +6,10 @@ import datetime
 from pynytimes import NYTAPI
 import time as time
 import pytz
-nyt = NYTAPI(os.getenv("nytimesPythonApiKey"));
+try:
+	nyt = NYTAPI(os.getenv("nytimesPythonApiKey"));
+except:
+	print("no nyt api key oh well")
 
 def populateNewsRatioColumn():
 

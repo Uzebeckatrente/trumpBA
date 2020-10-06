@@ -15,7 +15,9 @@ from sklearn.model_selection import train_test_split
 # graphFavCount();
 #
 # graphFavCountAndDerivative()
-# exit();
+# analyzeAllCapsPercentage()
+# analyzeShortTweetPercentage()
+
 # graphFavCountLogRound()
 # tweet = getTweetById(1194648339071016961)
 # print(tweet)
@@ -48,6 +50,7 @@ from sklearn.model_selection import train_test_split
 # favouriteOverTimeTrends()
 # tweetCountOverTime()
 #
+# analyzeOverUnderMeanSkewOfKeywords(loadFromStorage=True,numberInChart=10)
 # exit()
 # favouriteOverTimeTrends()
 # exit()
@@ -65,33 +68,66 @@ from sklearn.model_selection import train_test_split
 # analyzeTopAndBottomPercentiles()
 # exit()
 # historgramFavCounts([favC[0] for favC in getTweetsFromDB(n=-1,purePres=True,returnParams=["favCount"])])
-# graphPearsonsForApprFavOffset()
-
-# favouriteVsLengthTrends()
-# favouriteOverTimeTrends()
-# graphPearsonsForApprFavOffset()
-# populateCleanedTextColumn()
-
-#
-# analyzeTopAndBottomPercentiles()
-# compareVocabOverTime(18)
-# populateNewsHeadlinesTable()
-
-# for epochCount in range(3,101,3):
-# 	compareVocabOverTime(epochCount)
-# # compareVocabOverTime(5)
 # exit()
-
-
-# t1 = getTweetById(986318102735572992);
-# t2 = getTweetById(1157352001593892864);
-
-
+# # graphPearsonsForApprFavOffset()
+#
+# # favouriteVsLengthTrends()
+# # favouriteOverTimeTrends()
+# # graphPearsonsForApprFavOffset()
+# # populateCleanedTextColumn()
+# # tweetCountOverTime()
+# # graphFavCount()
+# # graphFavCountLogRound()
+#
+# #
+# # analyzeTopAndBottomPercentiles()
+# # compareVocabOverTime(18)
+# # populateNewsHeadlinesTable()
+#
+# # for epochCount in range(3,101,3):
+# # 	compareVocabOverTime(epochCount)
+# # # compareVocabOverTime(5)
+# # exit()
+#
+#
+# # t1 = getTweetById(986318102735572992);
+# # t2 = getTweetById(1157352001593892864);
+#
+# # tEmpty = getTweetsFromDB(purePres=True)
+# # print(len(tEmpty))
+# # exit()
+#
+# # graphPopularityOfTweetsInSpurts()
+# # # dataVisMain();
+# # exit();
 np.random.seed(69)
+# compareVocabOverTime(4,minCount=250)
 allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"], orderBy= "publishTime asc")
+# for numYears in [1,4]:
+# 	graphPopularityByWeekday([t[:5] for t in allPresTweetsFavCountAndCleanedText],years=numYears);
+# exit()
+# # analyzeOverUnderMeanSkewOfKeywords(loadFromStorage=False,numberInChart=10,minCount=12,ns=[1,2])
+# analyzeSentimentSkewsVader(allPresTweetsFavCountAndCleanedText);
+#
+# exit()
 normalizedTweets = normalizeTweetsFavCountsSlidingWindowStrategy(allPresTweetsFavCountAndCleanedText,30, determinator = "mean");
 normalizedTweetsFixedWindow = normalizeTweetsFavCountsFixedWindowStrategy(allPresTweetsFavCountAndCleanedText,30, determinator = "mean");
 
+endorseTweets = getTweetsFromDB(conditions = ["cleanedText like \"%endorse%\""],purePres = True,returnParams = ["favCount","cleanedText"])
+hillaryTweets = getTweetsFromDB(conditions = ["cleanedText like \"%hillary%\""],purePres = True,returnParams = ["favCount","cleanedText"])
+allTweets = hillaryTweets + endorseTweets;
+
+# hunna = getTweetsFromDB(purePres=True,n=100,returnParams = ["favCount","cleanedText"])
+# docs = [h[1] for h in hunna]
+
+
+
+# allPresTweetsFavCountAndCleanedText.sort(key=lambda t: t[0]);
+# for i in [0.1,0.2,0.3]:
+# 	print(Fore.MAGENTA,"i: ",i,Fore.RESET)
+# 	bottomTenthAndTopTenth =allPresTweetsFavCountAndCleanedText[:int(len(allPresTweetsFavCountAndCleanedText)*i)]+allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText)*(1-i)):]
+# 	mainTrumpLDA(bottomTenthAndTopTenth)
+# exit();
 
 # graphFavCount(allPresTweetsFavCountAndCleanedText,title="unnormalized");
 # graphFavCount(normalizedTweets,title="normalizedSlidingWindow");
@@ -137,6 +173,7 @@ print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," 
 # allCapsClassifier = AllCapsClassifier()
 newPoissonClassifier = RegressionModel("mlpClassifier");
 newPoissonClassifier2 = RegressionModel("mlPoisson");
+olsClassifier = RegressionModel("ols")
 
 # wordEmbeddingMatrix = newPoissonClassifier.computeWordEmbeddingMatrix(trainingLastYear);
 # print(wordEmbeddingMatrix);
@@ -161,10 +198,19 @@ newPoissonClassifier2 = RegressionModel("mlPoisson");
 #
 # newPoissonClassifier.crossValPercentageOfGramsToTake(trainingLastYearNorm)#,alpha=0.1,percentageNGrams=0,wordEmbeddingMatrix=True);
 
-#
-newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=30);
-newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=True",crossVal=False);
-scoreNew = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=True",crossVal=False);
+# olsClassifier.crossValRegularisatzia(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+
+olsClassifier.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=10)
+# newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=5);
+
+scoreNew = olsClassifier.test(testLastYear, title="OLS On Final Year Test Data",crossVal=False);
+olsClassifier.test(trainingLastYear, title="OLS On Final Year Train Data",crossVal=False);
+
+# scoreNew = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=True",crossVal=False);
+# newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=True",crossVal=False);
+
+# newPoissonClassifier2.crossValRegularisatzia(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+# exit();
 #
 # newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.2,wordEmbeddingMatrix=False);
 # newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=False",crossVal=False);

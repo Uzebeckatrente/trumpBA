@@ -119,20 +119,33 @@ def analyzeAllCapsPercentage():
 	for numSlices in [5]:
 		meanFavCountsByAllCapsRatioInterval = []
 		medianFavCountsByAllCapsRatioInterval = []
+		boxSizesMean = []
+		boxSizesMedian = []
 		labels = []
-		myIs = [i/numSlices for i in range(numSlices+1)]
+		myIs = [0.0]+[i/numSlices for i in range(numSlices+1)]
+		# myIs = [i / numSlices for i in range(numSlices + 1)]
 		for i in range(len(myIs)-1):
-			tweetsInRange = getTweetsFromDB(purePres=True, conditions=["allCapsRatio >= "+str(myIs[i]), "allCapsRatio <= "+str(myIs[i+1])],
-									 returnParams=["favCount"]);
+			if i == 1:
+				tweetsInRange = getTweetsFromDB(purePres=True, conditions=["allCapsRatio > "+str(myIs[i]), "allCapsRatio <= "+str(myIs[i+1])],
+										 returnParams=["favCount"]);
+				labels.append("(" + str(round(myIs[i], 2)) + "," + str(round(myIs[i + 1], 2)) + "]")
+			else:
+				tweetsInRange = getTweetsFromDB(purePres=True, conditions=["allCapsRatio >= "+str(myIs[i]), "allCapsRatio <= "+str(myIs[i+1])],
+										 returnParams=["favCount"]);
+				labels.append("[" + str(round(myIs[i], 2)) + "," + str(round(myIs[i + 1], 2)) + "]")
 
-			labels.append("["+str(round(myIs[i],2))+ ","+str(round(myIs[i+1],2))+"]")
+
 			mean = getMeanFavCountPresTweets(tweetsInRange);
 			median = getMedianFavCountPresTweets(tweetsInRange);
 			meanFavCountsByAllCapsRatioInterval.append(mean)
 			medianFavCountsByAllCapsRatioInterval.append(median)
+			boxSizesMean.append(len(tweetsInRange))
+			boxSizesMedian.append(len(tweetsInRange));
 
 
-		x = myIs[:-1]
+		x = [i/numSlices for i in range(numSlices+1)]
+		# x = myIs[:-1]
+
 
 		# plt.bar(x, height=medianFavCountsByAllCapsRatioInterval)
 		# plt.bar(x, height=medianFavCountsByAllCapsRatioInterval)
@@ -140,16 +153,128 @@ def analyzeAllCapsPercentage():
 		fig.subplots_adjust(left=0.06, right=0.94)
 		plt.xticks(x, labels)
 
-		plt.scatter(x,medianFavCountsByAllCapsRatioInterval,label="medianFavCountsByAllCapsRatioInterval");
-		plt.scatter(x, meanFavCountsByAllCapsRatioInterval, label="meanFavCountsByAllCapsRatioInterval");
-		plt.plot([x[0],x[-1]],[overallMean,overallMean],label="mean")
-		plt.plot([x[0], x[-1]], [overallMedian, overallMedian], label="median")
+		plt.scatter(x,medianFavCountsByAllCapsRatioInterval,label="Median Fav Count for Tweets in All-caps Interval",sizes=boxSizesMedian,color="#FF0000");
+		plt.scatter(x, meanFavCountsByAllCapsRatioInterval, label="Mean Fav Count for Tweets in All-caps Interval",sizes=boxSizesMean,color="#0000FF");
+		plt.plot([x[0],x[-1]],[overallMean,overallMean],label="Mean Fav Count for All Tweets",color="#00FF00")
+		plt.plot([x[0], x[-1]], [overallMedian, overallMedian], label="Median Fav Count for All Tweets",color="#000000")
 
 		pearsonMean = pearsonCorrelationCoefficient(x, meanFavCountsByAllCapsRatioInterval)
 		pearsonMedian = pearsonCorrelationCoefficient(x, medianFavCountsByAllCapsRatioInterval)
+
+		fitLineCoefficientsMedian = np.polyfit([i for i in range(len(medianFavCountsByAllCapsRatioInterval))], medianFavCountsByAllCapsRatioInterval, deg=1, full=False)
+		slope = fitLineCoefficientsMedian[0];
+		intercept = fitLineCoefficientsMedian[1]
+		plt.plot([x[0], x[-1]],[slope * i + intercept for i in [0,len(medianFavCountsByAllCapsRatioInterval)]],color="#FF0000",linestyle='dashed',label = "OLS Median; Correlation " + str(round(pearsonMedian,2)))
+
+		fitLineCoefficientsMean = np.polyfit([i for i in range(len(meanFavCountsByAllCapsRatioInterval))], meanFavCountsByAllCapsRatioInterval, deg=1, full=False)
+		slope = fitLineCoefficientsMean[0];
+		intercept = fitLineCoefficientsMean[1]
+		plt.plot([x[0], x[-1]], [slope * i + intercept for i in [0, len(meanFavCountsByAllCapsRatioInterval)]], color="#0000FF",linestyle='dashed',label="OLS Mean; Correlation " + str(round(pearsonMean,2)))
+
+
 		pearsons.append((pearsonMean,pearsonMedian));
-		plt.legend()
-		plt.title("correlation with mean: "+str(round(pearsonMean,2))+"; correlation with median: "+str(round(pearsonMedian,2)))
+		thaLegend = plt.legend()
+		for handle in thaLegend.legendHandles:
+			handle._sizes = [20]
+		plt.title("Increase in Favourite Count with Increase in All Caps Percentage")
+		print("boxSizesMean: ",boxSizesMean," boxSizesMedian: ",boxSizesMedian)
+		print(boxSizesMean[0]/np.sum(boxSizesMean))
+		print(boxSizesMedian[0]/np.sum(boxSizesMean))
+		print((boxSizesMedian[0]+boxSizesMedian[1])/np.sum(boxSizesMean))
+		print((boxSizesMean[0]+boxSizesMean[1])/np.sum(boxSizesMean))
+		plt.show()
+	for p in pearsons:
+		print(p);
+	exit()
+	favCounts = [tweet[0] for tweet in tweets]
+	publishTimes = [dateTimeToInt(tweet[1]) for tweet in tweets]
+	allCapsRatio = [tweet[2] for tweet in tweets]
+
+	plt.scatter(allCapsRatio, favCounts);
+	pearson = pearsonCorrelationCoefficient(favCounts, allCapsRatio)
+	plt.title(pearson)
+
+
+	plt.show()
+
+def analyzeShortTweetPercentage():
+	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount, publishTime, tweetText"]);
+	# tweets = [tweet for tweet in tweets if tweet[2] > 0.5]
+	empties = [t for t in tweets if t[2] == ""]
+	rest = [t for t in tweets if t[2] != ""]
+	favCounts = [t[0] for t in tweets]
+	rest.sort(key=lambda tuple: len(tuple[2].split(" ")), reverse=False);
+	print(len(empties),len(rest))
+	tweets = empties + rest;
+	overallMedian= getMedianFavCountPresTweets(tweets)
+	overallMean = getMeanFavCountPresTweets(tweets)
+	pearsons = []
+
+	for numSlices in [5]:
+		meanFavCountsByAllCapsRatioInterval = []
+		medianFavCountsByAllCapsRatioInterval = []
+		boxSizesMean = []
+		boxSizesMedian = []
+		labels = []
+		myIs = list(range((np.min([len(tup[2].split(" ")) for tup in tweets])),np.max([len(tup[2].split(" ")) for tup in tweets])))
+		myIsComp = [0,2,4,8,14,np.max([len(tup[2].split(" ")) for tup in tweets])]
+		# myIs = [i / numSlices for i in range(numSlices + 1)]
+		for i in range(len(myIsComp[:-1])):
+		# for i in myIs:
+			tweetsInRange = [t for t in tweets if myIsComp[i] <= len(t[2].split(" ")) < myIsComp[i+1]]
+			labels.append("[" + str(round(max(myIsComp[i],0), 2)) + "," + str(round(myIsComp[i + 1], 2)) + ")")
+
+
+			mean = getMeanFavCountPresTweets(tweetsInRange);
+			median = getMedianFavCountPresTweets(tweetsInRange);
+			meanFavCountsByAllCapsRatioInterval.append(mean)
+			medianFavCountsByAllCapsRatioInterval.append(median)
+			boxSizesMean.append(len(tweetsInRange))
+			boxSizesMedian.append(len(tweetsInRange));
+
+
+		x = [i for i in range(len(labels))]
+		# x = myIs[:-1]
+
+
+		# plt.bar(x, height=medianFavCountsByAllCapsRatioInterval)
+		# plt.bar(x, height=medianFavCountsByAllCapsRatioInterval)
+		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+		fig.subplots_adjust(left=0.06, right=0.94)
+		plt.xticks(x, labels)
+
+		plt.scatter(x,medianFavCountsByAllCapsRatioInterval,label="Median Favourite Count for Tweets in Length Interval",sizes=boxSizesMedian,color="#FF0000");
+		plt.scatter(x, meanFavCountsByAllCapsRatioInterval, label="Mean Favourite Count for Tweets in Length Interval",sizes=boxSizesMean,color="#0000FF");
+		plt.plot([x[0],x[-1]],[overallMean,overallMean],label="Mean Fav Count for All Tweets",color="#00FF00")
+		plt.plot([x[0], x[-1]], [overallMedian, overallMedian], label="Median Fav Count for All Tweets",color="#000000")
+
+		pearsonMean = pearsonCorrelationCoefficient(x, meanFavCountsByAllCapsRatioInterval)
+		pearsonMedian = pearsonCorrelationCoefficient(x, medianFavCountsByAllCapsRatioInterval)
+
+		fitLineCoefficientsMedian = np.polyfit([i for i in range(len(medianFavCountsByAllCapsRatioInterval))], medianFavCountsByAllCapsRatioInterval, deg=1, full=False)
+		slope = fitLineCoefficientsMedian[0];
+		intercept = fitLineCoefficientsMedian[1]
+		plt.plot([x[0], x[-1]],[slope * i + intercept for i in [x[0],x[-1]]],color="#FF0000",linestyle='dashed',label = "OLS Median; Correlation " + str(round(pearsonMedian,2)))
+
+		fitLineCoefficientsMean = np.polyfit([i for i in range(len(meanFavCountsByAllCapsRatioInterval))], meanFavCountsByAllCapsRatioInterval, deg=1, full=False)
+		slope = fitLineCoefficientsMean[0];
+		intercept = fitLineCoefficientsMean[1]
+		plt.plot([x[0], x[-1]], [slope * i + intercept for i in [x[0],x[-1]]], color="#0000FF",linestyle='dashed',label="OLS Mean; Correlation " + str(round(pearsonMean,2)))
+
+
+		pearsons.append((pearsonMean,pearsonMedian));
+		thaLegend = plt.legend()
+		for handle in thaLegend.legendHandles:
+			handle._sizes = [20]
+		plt.title("Short Tweets are more Popular")
+		print("boxSizesMean: ",boxSizesMean," boxSizesMedian: ",boxSizesMedian)
+		print(boxSizesMean[0]/np.sum(boxSizesMean))
+		print(boxSizesMedian[0]/np.sum(boxSizesMean))
+		print(boxSizesMean[-1] / np.sum(boxSizesMean))
+		print(boxSizesMedian[-1] / np.sum(boxSizesMean))
+		print((boxSizesMedian[0]+boxSizesMedian[1])/np.sum(boxSizesMean))
+		print((boxSizesMean[0]+boxSizesMean[1])/np.sum(boxSizesMean))
+		plt.ylim(int(min(meanFavCountsByAllCapsRatioInterval[-1],meanFavCountsByAllCapsRatioInterval[-1])-20000),int(max(meanFavCountsByAllCapsRatioInterval[0],meanFavCountsByAllCapsRatioInterval[0])+5000))
 		plt.show()
 	for p in pearsons:
 		print(p);

@@ -137,7 +137,7 @@ def historgramFavCounts(favCounts):
 	# 	# boxSize *= 1000
 	# 	boxSize *= 0.1
 	# 	boxes = [boxSize*i for i in range(1,int(maxFavCount/(boxSize))+1)]
-	# 	print("boxy")
+	# 	printhistorgramFavCounts("boxy")
 	# 	N, bins, patches = plt.hist(favCounts,bins=boxes,)
 	# 	print("histy")
 	# 	for i in range(len(patches)):
@@ -145,8 +145,9 @@ def historgramFavCounts(favCounts):
 	# 	print("patchy")
 	#
 	# 	plt.show()
+	from scipy.stats import kstest
 	favCounts.sort(reverse=False)
-	favCounts = np.array([round(np.log(fvc),0) if fvc >0 else 0 for fvc in favCounts])
+	favCounts = np.array([np.log(fvc) if fvc >0 else 0 for fvc in favCounts])
 	maxFavCount = favCounts[-1]
 	colors = ['b', 'r', 'black']
 	for boxSize in range(1, 20):
@@ -154,12 +155,16 @@ def historgramFavCounts(favCounts):
 		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
 		fig.subplots_adjust(left=0.06, right=0.94)
 		print("boxy")
-		boxSize = int(maxFavCount);
+		# boxSize = int(maxFavCount);
 		N, bins, patches = plt.hist(favCounts, bins = boxSize)
 		print("histy")
 		for i in range(len(patches)):
 			patches[i].set_facecolor(colors[i % 3])
 		print("patchy")
+		x = np.linspace(-15, 15, 9) + 10
+
+		print(favCounts)
+		plt.title("Logarithmized Favourite Counts; KS-Score " + str(kstest(favCounts-np.mean(favCounts),"norm")))
 
 		plt.show()
 
@@ -181,9 +186,10 @@ def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,titl
 
 	# Save the default tick positions, so we can reset them...
 
-	plt.plot(favX,[avgFav]*len(favX),linestyle='--')
+	plt.plot(favX,[avgFav]*len(favX),linestyle='--',label="Average for whole Dataset")
 	plt.boxplot(data, positions=x, notch=False,showfliers=True)
 	plt.title(title)
+	plt.legend()
 
 	plt.xticks(x,keywords)
 	plt.show()

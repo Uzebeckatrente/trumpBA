@@ -354,7 +354,82 @@ def calculateAndStorenGramsWithFavsMinusMeanMedian(ns,tweets, retabulate = False
 	print(Fore.MAGENTA, time.time() - startingTime, Style.RESET_ALL);
 	return tweetsHash
 
-def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = True,ns = [1,2,3,4]):
+def analyzeSentimentSkewsVader(tweets,loadFromStorage = True,ns = [1,2,3,4],minCount = 6):
+	from nltk.sentiment.vader import SentimentIntensityAnalyzer
+	sentiment_analyzer = SentimentIntensityAnalyzer()
+
+	tweetsHash = hashTweets(tweets)
+
+	if loadFromStorage:
+		try:
+			nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash)
+
+		except:
+			print("extracting from storage failed; retabulating.")
+			loadFromStorage = False
+
+	if not loadFromStorage:
+		tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(ns, tweets, retabulate=True, minCount=minCount);
+		nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash)
+
+	nGramsWithFavsMinusMean.sort(key = lambda tup: tup[nGramStorageIndicesSkew["skew"]])
+	nGramsWithFavsMinusMedian.sort(key=lambda tup: tup[nGramStorageIndicesSkew["skew"]])
+	print("n00b")
+	skewsMean = []
+	vadersMean = []
+
+
+
+	for x in nGramsWithFavsMinusMean[:10]+nGramsWithFavsMinusMean[-10:]:
+		print(x[nGramStorageIndicesSkew["nGram"]],x[nGramStorageIndicesSkew["skew"]])
+	# print(nGramsWithFavsMinusMean[-10:])
+
+	skewsMedian = []
+	vadersMedian = []
+	for tupIndex in [(x+1)*-1 for x in list(range(int(len(nGramsWithFavsMinusMean)*0.1)))]+list(range(int(len(nGramsWithFavsMinusMean)*0.1)))[::-1]:
+	# for tupIndex in list(range(200))[::-1]:
+		tupMean = nGramsWithFavsMinusMean[tupIndex]
+		tupMedian = nGramsWithFavsMinusMedian[tupIndex]
+
+		nGramMean = tupMean[nGramStorageIndicesSkew["nGram"]]
+		nGramMedian = tupMedian[nGramStorageIndicesSkew["nGram"]]
+		meanIn = False;
+		for nGram in nGramMean.split(" "):
+			if nGram in sentiment_analyzer.lexicon:
+				meanIn = True;
+				break;
+
+		if meanIn:
+			skewsMean.append(tupMean[nGramStorageIndicesSkew["skew"]])
+			vaderMean = sentiment_analyzer.polarity_scores(nGramMean)["compound"];
+			vadersMean.append(vaderMean);
+
+		medianIn = False;
+		for nGram in nGramMedian.split(" "):
+			if nGram in sentiment_analyzer.lexicon:
+				medianIn = True;
+				break;
+
+		if medianIn:
+			skewsMedian.append(tupMedian[nGramStorageIndicesSkew["skew"]])
+			vaderMedian = sentiment_analyzer.polarity_scores(nGramMedian)["compound"];
+			vadersMedian.append(vaderMedian);
+	print(list(zip(vadersMean,skewsMean)))
+	print(list(zip(vadersMedian,skewsMedian)))
+	skewsMedian = [x/(np.max(skewsMedian)-np.min(skewsMedian)) for x in skewsMedian]
+	skewsMedian = [(x - np.min(skewsMedian))*2-1 for x in skewsMedian]
+	# plt.plot([i for i in range(len(skewsMean))],skewsMean,label="skews mean")
+	plt.scatter([i for i in range(len(skewsMedian))], skewsMedian,label="Popularity (Scaled)",c="#FF0000")
+	# plt.plot([i for i in range(len(vadersMean))], vadersMean, label="vaders mean")
+	plt.plot([i for i in range(len(vadersMedian))], vadersMedian, label="Sentiment (Vader)")
+	pearsonMean = pearsonCorrelationCoefficient(skewsMean,vadersMean)
+	pearsonMedian = pearsonCorrelationCoefficient(skewsMedian, vadersMedian)
+	plt.title("Correlation of Sentimental Positivity with Word Popularity: " + str(round(pearsonMedian,2)))
+	plt.legend()
+	plt.show()
+
+
+def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = True,ns = [1,2,3,4],minCount = 15,numberInChart = 20):
 	fvcMean = getMeanFavCountPresTweets()
 	fvcMedian = getMedianFavCountPresTweets()
 
@@ -372,11 +447,11 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 			loadFromStorage = False
 
 	if not loadFromStorage:
-		tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(ns, tweets,retabulate=True);
+		tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(ns, tweets,retabulate=True,minCount=minCount);
 		nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash)
 
-
-
+	nGramsWithFavsMinusMean.sort(key = lambda tup: tup[nGramStorageIndicesSkew["skew"]])
+	nGramsWithFavsMinusMedian.sort(key=lambda tup: tup[nGramStorageIndicesSkew["skew"]])
 	# nGramsWithFavsMinusMean = nGramsWithFavsMinusMean[-20:]
 	# nGramsWithFavsMinusMedian = nGramsWithFavsMinusMedian[-20:]
 
@@ -387,12 +462,12 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 
 	df = pd.DataFrame(dataFrameDict)
 	print(df)
-	meanXs = [tup[nGramStorageIndicesSkew["nGram"]].replace(" ", "\n") + "\n" + str(tup[nGramStorageIndicesSkew["count"]]) for tup in nGramsWithFavsMinusMean[:20]]
-	medianXs = [tup[nGramStorageIndicesSkew["nGram"]].replace(" ", "\n") + "\n" + str(tup[nGramStorageIndicesSkew["count"]]) for tup in nGramsWithFavsMinusMedian[:20]]
-	meanYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMean[:20]]
-	medianYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMedian[:20]];
-	boxAndWhiskerForKeyWordsFavs(meanXs,meanYs , fvcMean, title="meansDifference")
-	boxAndWhiskerForKeyWordsFavs(medianXs, medianYs, fvcMedian, title="mediansDifference")
+	meanXs = [tup[nGramStorageIndicesSkew["nGram"]].replace(" ", "\n") + "\n" + str(tup[nGramStorageIndicesSkew["count"]]) for tup in nGramsWithFavsMinusMean[:numberInChart]]
+	medianXs = [tup[nGramStorageIndicesSkew["nGram"]].replace(" ", "\n") + "\n" + str(tup[nGramStorageIndicesSkew["count"]]) for tup in nGramsWithFavsMinusMedian[:numberInChart]]
+	meanYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMean[:numberInChart]]
+	medianYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMedian[:numberInChart]];
+	boxAndWhiskerForKeyWordsFavs(meanXs,meanYs , fvcMean, title="Keywords with Lowest Expected Favourite Count")
+	boxAndWhiskerForKeyWordsFavs(medianXs, medianYs, fvcMedian, title="Keywords with Lowest Median Favourite Count")
 
 def normalizeTweetsFavCountsFixedWindowStrategy(tweets,daysPerMonth, determinator = "mean"):
 
@@ -637,12 +712,16 @@ def graphFavCount(tweets = None, title=""):
 	if tweets == None:
 		tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
 	favCounts = [t[0] for t in tweets];
-	plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
-	for i in [50000,100000,150000,200000]:
-		plt.plot([0,len(tweets)],[i,i]);
-	plt.plot([int(len(tweets)*0.75),int(len(tweets)*0.75)],[0,max(favCounts)]);
+	# plt.plot([i for i in range(len(tweets))], [t[0] for t in tweets])
+	# for i in [50000,100000,150000,200000]:
+	# 	plt.plot([0,len(tweets)],[i,i]);
+	# plt.plot([int(len(tweets)*0.75),int(len(tweets)*0.75)],[0,max(favCounts)]);
+	plt.boxplot(favCounts);
+	print(favCounts[int(len(favCounts)/8)],favCounts[-int(len(favCounts)/8)])
 	pearson = pearsonCorrelationCoefficient(favCounts, [i for i in range(len(favCounts))]);
-	plt.title("FavCount for all presidential tweets; pearson : "+str(pearson)+"; " + title);
+	plt.title("FavCount for all presidential tweets; Correlation Coefficient : "+str(pearson)+"; " + title);
+
+
 
 	plt.show();
 

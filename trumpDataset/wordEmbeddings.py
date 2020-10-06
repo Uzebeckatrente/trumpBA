@@ -27,6 +27,35 @@ def computeWordEmbeddings(cleanFile = "trumpDataset/clean.txt", embeddingsFile =
 	return model
 
 
+def computeWordEmbeddingsDict(embeddingsFilePath = "/Users/f002nb9/Downloads/glove.twitter.27B/glove.twitter.27B.25d.txt"):
+	fp = open(embeddingsFilePath,"r");
+	lines = fp.readlines();
+	d = {};
+	for line in lines:
+		tokens = line.split(" ");
+		word = tokens[0];
+		if word[0] == "<" and word[-1] == ">":
+			continue;
+		else:
+			vec = np.array([float(t) for t in tokens[1:]]);
+			d[word] = vec;
+	return d;
+
+def getSumOfGloveVectorsForTweet(cleanedText,gloveDict):
+	summy = np.zeros_like(gloveDict[list(gloveDict.keys())[0]]);
+	totalTokens = 0;
+	for word in cleanedText.split(" "):
+		try:
+			summy += gloveDict[word];
+			totalTokens += 1;
+		except:
+			continue;
+	summy /= totalTokens
+	return summy;
+
+
+
+
 def getSumOfVectorsForTweet(oneGrams, tfidfScores):
 	if len(oneGrams) == 0:
 		print(oneGrams);

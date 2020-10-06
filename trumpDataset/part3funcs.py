@@ -89,7 +89,7 @@ def computeMostCommonnGrams(tweets, n, retabulate = False):
 
 	vocabAndnGramCounts.sort(key=lambda tup: tup[1], reverse=True)
 
-
+	print("in dir: ",os.listdir("."))
 	with open('trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p', 'wb') as fp:
 		print("writing file: ",'trumpBA/trumpDataset/npStores/'+str(n)+'GramsInDescendingFrequency'+tweetsHash+'.p')
 		pickle.dump(vocabAndnGramCounts, fp)

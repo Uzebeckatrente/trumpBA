@@ -2,8 +2,10 @@ import numpy as np
 
 
 def pearsonCorrelationCoefficient(vec1, vec2):
+
 	vec1 = np.asarray(vec1);
 	vec2 = np.asarray(vec2);
+	# print("lennus: ", vec1.shape, vec2.shape)
 	vec1 = vec1-np.mean(vec1)
 	vec2 = vec2-np.mean(vec2);
 

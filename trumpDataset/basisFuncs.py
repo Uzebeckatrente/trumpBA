@@ -30,12 +30,17 @@ mydb = mysql.connector.connect(host="localhost",user="root",passwd="felixMySQL",
 mycursor = mydb.cursor(buffered=True)
 
 mainTable = "tta2"
-purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0","mediaType = \"none\""]
+purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0","mediaType = \"none\""] #"cleanedText like \"% %\""
+
+
+def flattenList(train):
+	trainFlat = [item for sublist in train for item in sublist]
+	return trainFlat;
 
 def flattenFolds(folds, holdoutIndex):
 	if holdoutIndex != -1:
 		train = folds[0:holdoutIndex] + folds[holdoutIndex + 1:];
-		trainFlat = [item for sublist in train for item in sublist]
+		trainFlat = flattenList(train);
 		holdOut = folds[holdoutIndex];
 		return trainFlat, holdOut
 	else:
@@ -185,11 +190,15 @@ def camlify(string, firstLetterCapital = True):
 
 def on_plot_hover(event,plot,nGramsForAllEpochsRegularized):
 	# Iterating over each data member plotted
+	# print("zark off, ",plot.get_lines())
+
 	for curve in plot.get_lines():
+		# print("curvy : ",curve)
 		# Searching which data member corresponds to current mouse position
 		if curve.contains(event)[0]:
 			epoch = int(round(event.xdata,0));
 			gram = curve.get_label();
+			# print("gram: ",gram)
 			if gram[:5] == "_line":
 				continue;
 			global lastEpochAndGram;
@@ -198,7 +207,7 @@ def on_plot_hover(event,plot,nGramsForAllEpochsRegularized):
 			else:
 				lastEpochAndGram=(epoch,gram)
 			print("gram: ",gram," epoch: ",epoch," topo:",round(nGramsForAllEpochsRegularized[epoch][gram][2],2)," skew: ",round(nGramsForAllEpochsRegularized[epoch][gram][1],2)," count: ",round(nGramsForAllEpochsRegularized[epoch][gram][0],2))
-
+		# print("done")
 
 	# for line in plot.get_lines():
 	# 	print(line);
@@ -243,6 +252,7 @@ def getTweetsFromDB(n=-1,purePres = False, conditions=[], returnParams="*",order
 	query = "select "+returnParams+" from "+mainTable+" "+whereString + " order by "+orderBy+" "+limiter;
 	mycursor.execute(query)
 	tweets = mycursor.fetchall()
+
 
 	return tweets
 

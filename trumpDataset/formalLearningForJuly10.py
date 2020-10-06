@@ -8,7 +8,8 @@ from sklearn.model_selection import cross_val_score;
 from .daysOfTheWeek import determineDayOfWeek,determineSegmentOfDay,determineYearOfTweet
 from sklearn.neural_network import MLPClassifier, MLPRegressor;
 import sklearn.linear_model
-from .wordEmbeddings import getSumOfVectorsForTweet;
+from .wordEmbeddings import getSumOfVectorsForTweet, computeWordEmbeddingsDict, getSumOfGloveVectorsForTweet
+
 from sklearn.metrics import classification_report,r2_score
 
 from keras import backend as K, regularizers, optimizers
@@ -29,6 +30,39 @@ class RegressionModel():
 		self.ns = [1, 2, 3, 4]  # ,3,4]
 
 	def computeWordEmbeddingMatrix(self, trainingTweets):
+		'''
+		TODO: fix to proper word embeddings
+		:param trainingTweets:
+		:return:
+		'''
+		tweetsHash = hashTweets(trainingTweets)
+		try:
+			return np.load("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix" + tweetsHash + ".npy")
+		except:
+			pass;
+		print(Fore.MAGENTA, "computing word embedding matrix", Fore.RESET);
+
+		wordEmbeddingsDict = computeWordEmbeddingsDict()
+
+
+
+
+		wordEmbeddingMatrix = np.zeros((len(trainingTweets), 25));
+
+		for i in range(len(trainingTweets)):
+			sentenceEmbedding = getSumOfGloveVectorsForTweet(trainingTweets[i], wordEmbeddingsDict);
+			wordEmbeddingMatrix[i] = sentenceEmbedding;
+			if i % 100 == 0:
+				print(i / len(trainingTweets));
+		np.save("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix" + tweetsHash + ".npy", wordEmbeddingMatrix)
+		return wordEmbeddingMatrix
+
+	def computeWordEmbeddingMatrixDepricated(self, trainingTweets):
+		'''
+		TODO: fix to proper word embeddings
+		:param trainingTweets:
+		:return:
+		'''
 		tweetsHash = hashTweets(trainingTweets)
 		try:return np.load("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix"+tweetsHash+".npy")
 		except:pass;
@@ -72,14 +106,18 @@ class RegressionModel():
 		if self.wordEmbeddingMatrix:
 			wordEmbeddingMatrix = self.computeWordEmbeddingMatrix(tweets);
 
-		favs = [t[0] for t in tweets];
-		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)+len(extraParameters)+(wordEmbeddingMatrix.shape[1] if self.wordEmbeddingMatrix else 0)));
-		targetMatrix = np.ndarray((len(tweets), 1))
-		offSet = len(self.nGramIndices);
 
+
+		#####create data matrices
+		targetMatrix = np.ndarray((len(tweets), 1))
+		bigMatrix = np.zeros((len(tweets), len(self.allNGrams)+len(extraParameters)+(wordEmbeddingMatrix.shape[1] if self.wordEmbeddingMatrix else 0)));
+		#####\create data matrices
+
+
+		#####fill m-hot vector
+		offSet = len(self.nGramIndices);
 		for tweetIndex, tweet in enumerate(tweets):
 			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
-
 			allCapsForTweet = [t.strip() for t in tweet[5].lower().split(" ") if len(t.strip()) > 0];
 			for nGram in nGramsForTweet:
 				if nGram in self.nGramIndices:
@@ -89,7 +127,11 @@ class RegressionModel():
 					else:
 						bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
 
+		#####\fill m-hot vector
+
+		#####fill target
 			if self.task == "class":
+				#todo: richte boxes ein
 				#classification!
 				if tweet[0]> self.twoClassBarrierCount:
 					targetMatrix[tweetIndex] = 1
@@ -99,7 +141,9 @@ class RegressionModel():
 					targetMatrix[tweetIndex] = 0;
 			else:
 				#regression!
-				if self.logReg and False:
+				#todo: richte transformations ein
+				if self.transformation == "log":
+
 
 					targetMatrix[tweetIndex] = int(tweet[0]/10000);
 					# print(int(np.log(np.log(tweet[0]*100))));
@@ -109,7 +153,7 @@ class RegressionModel():
 					targetMatrix[tweetIndex] = tweet[0];
 					# targetMatrix[tweetIndex] = 10;
 
-
+			#todo: ameliorate the extra parameter interface
 			for param in range(len(extraParameters)):
 				bigMatrix[tweetIndex][offSet + param] = extraParameters[param][tweetIndex];
 		
@@ -181,7 +225,7 @@ class RegressionModel():
 		trainingTweets = myNegs + thesePositives;
 		return trainingTweets;
 
-	def train(self,trainingTweets,extraParamNum=6,hiddenLayers = (3,),allCapsBoost=0.5,alpha=0.1,percentileNegativePositive=1,percentileSplit = 0.75,wordEmbeddingMatrix=False, twoClassBarrierCount=-1,logReg = False,distancePercentileFromSplit = 0.4, percentageNGrams = 0.5):
+	def train(self,trainingTweets,extraParamNum=6,hiddenLayers = (3,),allCapsBoost=0.5,alpha=0.1,percentileNegativePositive=1,percentileSplit = 0.75,wordEmbeddingMatrix=True, twoClassBarrierCount=-1,distancePercentileFromSplit = 0.4, percentageNGrams = 0.5, transformation = None):
 		'''
 
 		:param trainingTweets: tweets in format ["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"]
@@ -193,9 +237,9 @@ class RegressionModel():
 		:param percentileSplit: fulcrum for 2-class classification
 		:param wordEmbeddingMatrix: boolean, if we are using word embeddings in our trainer (later becomes a matrix)
 		:param twoClassBarrierCount: private parameter, normally set to -1, otherwise to indicate the count used for the fulcrum
-		:param logReg: regularize the fav counts
 		:param distancePercentileFromSplit: not implemented, would indicate the training tweets which we ignore that are close to the fulcrum
 		:param percentageNGrams: 0 to 0.5, if 0 no n-grams are used, if 0.5 all are used, if in between only the most/least popular n-grams are used
+		:param transformation: None, "log","countReduce". if log, favourite counts are log'd and rounded to create basically normal distribution; if countReduce, they are divided by 100000 or so and rounded
 		:return:
 		'''
 		trainingTweets.sort(key=lambda tuple: tuple[0], reverse=False)
@@ -214,7 +258,7 @@ class RegressionModel():
 		if self.learner == "poisson":
 			self.model = PoissonRegressor(alpha=10)
 		elif self.learner == "ols":
-			self.model = LinearRegression();
+			self.model = Ridge(alpha=alpha);
 		elif self.learner == "mlpClassifier":
 			self.model = MLPClassifier(hidden_layer_sizes=hiddenLayers,alpha=alpha);
 		elif self.learner == "mlPoisson":
@@ -226,7 +270,7 @@ class RegressionModel():
 			alpha = 0.5;
 
 		self.wordEmbeddingMatrix = wordEmbeddingMatrix;
-		self.logReg = logReg;
+		self.transformation = transformation;
 		self.percentileNegativePositive = percentileNegativePositive;
 		self.percentileSplit = percentileSplit;
 		if twoClassBarrierCount == -1:
@@ -350,8 +394,8 @@ class RegressionModel():
 
 		predictions = self.model.predict(predictionMatrix);
 		print("predictions: ",predictions);
-		plt.plot([i for i in range(len(predictions))],predictions);
-		plt.show();
+		# plt.plot([i for i in range(len(predictions))],predictions);
+		# plt.show();
 
 		if self.task == "class":
 
@@ -456,8 +500,8 @@ class RegressionModel():
 		scores = []
 		scoresDict = {};
 		resultDict = {}
-		self.twoClassBarrierCount = tweets[int(len(tweets) * self.percentileNegativePositive)][0];
-		alphaPossibilities = [1,2,3,4,5]#,5,7,20,30,40,50,100];
+		# self.twoClassBarrierCount = tweets[int(len(tweets) * self.percentileNegativePositive)][0];
+		alphaPossibilities = [5,10,15,20,30]#,40,50,100];
 		index = 0;
 		for alpha in alphaPossibilities:
 			scoresDict[alpha] = []
@@ -465,28 +509,10 @@ class RegressionModel():
 				train = folds[0:numHoldoutFold] + folds[numHoldoutFold + 1:];
 				holdOut = folds[numHoldoutFold];
 				trainFlat = [item for sublist in train for item in sublist]
-				if self.percentileNegativePositive != -1:
-
-
-					trainFlat.sort(key=lambda t: t[0]);
-					theseNegatives = [t for t in trainFlat if t[0] < self.twoClassBarrierCount]
-					thesePositives = [t for t in trainFlat if t[0] >= self.twoClassBarrierCount]
-
-
-					negativeTrainingIDX = np.random.choice(len(theseNegatives), len(thesePositives), replace=False);
-					myNegs = []
-					for i in range(len(theseNegatives)):
-						if i in negativeTrainingIDX:
-							myNegs.append(theseNegatives[i])
-					lennus = ((len(myNegs), len(thesePositives)));
-					print("schnitt: ", [x for x in myNegs if x in thesePositives]);
-					training = myNegs + thesePositives;
-				else:
-					training = trainFlat;
 
 
 
-				self.train(training,alpha=alpha,crossVal=True);
+				self.train(trainFlat,alpha=alpha);
 				score = self.test(holdOut,crossVal=True);
 				scoresDict[alpha].append(score);
 				index += 1;
