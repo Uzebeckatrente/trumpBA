@@ -18,7 +18,7 @@ def determineYearOfTweet(minTime,maxTime,years,t):
 def determineDayOfWeek(dt):
 	return dt.weekday();
 
-def determineSegmentOfDay(dt: datetime.datetime, numSegments = 4):
+def determineSegmentOfDay(dt: datetime.datetime, numSegments = 12):
 	segSize = 24/numSegments;
 	segments = [segSize*i for i in range(numSegments+1)];
 	for i in range(len(segments)):

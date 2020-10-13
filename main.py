@@ -102,7 +102,7 @@ from sklearn.model_selection import train_test_split
 # # exit();
 np.random.seed(69)
 # compareVocabOverTime(4,minCount=250)
-allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"], orderBy= "publishTime asc")
+allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords","tweetText"], orderBy= "publishTime asc")
 # for numYears in [1,4]:
 # 	graphPopularityByWeekday([t[:5] for t in allPresTweetsFavCountAndCleanedText],years=numYears);
 # exit()
@@ -157,6 +157,7 @@ allPresTweetsFavCountAndCleanedTextByYear3 = splitTweetsByYear(allPresTweetsFavC
 trainingLastYear, testLastYear, foldsLastYear = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear5[-1])
 trainingLastYearNorm, testLastYearNorm, foldsByYearNorm = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear5Normalized[-1])
 trainingLastYearNorm.sort(key = lambda x: x[0]);
+testLastYear.sort(key = lambda x: x[0]);
 trainingLastYear3, testLastYear3, _ = splitTrainingTest(allPresTweetsFavCountAndCleanedTextByYear3[-1])
 training, test, folds = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
 trainingNorm, testNorm, foldsNorm = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
@@ -173,7 +174,9 @@ print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," 
 # allCapsClassifier = AllCapsClassifier()
 newPoissonClassifier = RegressionModel("mlpClassifier");
 newPoissonClassifier2 = RegressionModel("mlPoisson");
+poissonRegressor = RegressionModel("poisson");
 olsClassifier = RegressionModel("ols")
+mlpRegressor = RegressionModel("mlpRegressor")
 
 # wordEmbeddingMatrix = newPoissonClassifier.computeWordEmbeddingMatrix(trainingLastYear);
 # print(wordEmbeddingMatrix);
@@ -198,23 +201,73 @@ olsClassifier = RegressionModel("ols")
 #
 # newPoissonClassifier.crossValPercentageOfGramsToTake(trainingLastYearNorm)#,alpha=0.1,percentageNGrams=0,wordEmbeddingMatrix=True);
 
-# olsClassifier.crossValRegularisatzia(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+# mlpClassifier.crossValRegularisatzia(allPresTweetsFavCountAndCleanedTextByYear5[-1])
 
-olsClassifier.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=10)
+
 # newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.5,wordEmbeddingMatrix=True,alpha=5);
 
-scoreNew = olsClassifier.test(testLastYear, title="OLS On Final Year Test Data",crossVal=False);
-olsClassifier.test(trainingLastYear, title="OLS On Final Year Train Data",crossVal=False);
+'''
+EWIGEN
+'''
+# olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10)
+# scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
+#
+# olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=False,alpha=10)
+# scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
+# olsClassifier.test(trainingLastYear, title="Ridge Regression On Final Year Train Data",crossVal=False);
+
+# olsClassifier.crossValPercentageOfGramsToTake(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+
+
+
+# mlpRegressor.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=100000,numIterationsMax=500);
+# scoreNew2 = mlpRegressor.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+#
+# mlpRegressor.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=False,alpha=100000,numIterationsMax=500);
+# scoreNew2 = mlpRegressor.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+# mlpRegressor.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
+# #
+# newPoissonClassifierReg.crossValPercentageOfGramsToTake(allPresTweetsFavCountAndCleanedTextByYear5[-1],alphasPoss=[500,1000,10000,100000])
+
+# newPoissonClassifierReg.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=1000);
+# scoreNew2 = newPoissonClassifierReg.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+# newPoissonClassifierReg.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
+
+# newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.5,includeWordEmbeddingMatrix=True,alpha=100);
+# scoreNew2 = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+# newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
+
+fourModelComparisonRegression(trainingLastYear,testLastYear,allPresTweetsFavCountAndCleanedTextByYear5)
+exit()
+'''
+End Ewigen
+'''
+
+
+# newPoissonClassifierReg.crossValPercentageOfGramsToTake(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+
+#
+
+# mlpClassifier.crossValNumHiddenLayers(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+# mlpRegressor.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True)
+# scoreNew = mlpRegressor.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
+# mlpRegressor.test(trainingLastYear, title="Ridge Regression On Final Year Train Data",crossVal=False);
 
 # scoreNew = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=True",crossVal=False);
 # newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=True",crossVal=False);
 
 # newPoissonClassifier2.crossValRegularisatzia(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+
 # exit();
 #
-# newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.2,wordEmbeddingMatrix=False);
-# newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=False",crossVal=False);
-# scoreNew = newPoissonClassifier2.test(testLastYearNorm, title="test wordEmbeddingMatrix=False",crossVal=False);
+# newPoissonClassifierReg.crossValEverything(allPresTweetsFavCountAndCleanedTextByYear5[-1])
+
+# newPoissonClassifier2.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=100);
+# newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
+# scoreNew2 = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+#
+
+
 #
 # newPoissonClassifier2.train(trainingLastYearNorm,percentageNGrams=0.5,wordEmbeddingMatrix=True);
 # newPoissonClassifier2.test(trainingLastYearNorm,title="training wordEmbeddingMatrix=True",crossVal=False);

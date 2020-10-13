@@ -28,6 +28,12 @@ def computeWordEmbeddings(cleanFile = "trumpDataset/clean.txt", embeddingsFile =
 
 
 def computeWordEmbeddingsDict(embeddingsFilePath = "/Users/f002nb9/Downloads/glove.twitter.27B/glove.twitter.27B.25d.txt"):
+	# try:
+	# 	d=np.load("/Users/f002nb9/Documents/f002nb9/bachelor/trumpBA/trumpDataset/npStores/wordEmbeddingsDict.npy")
+	# 	print(Fore.MAGENTA,"pulled wordEmbeddingsDict from storage",Fore.RESET)
+	# 	return d;
+	# except:
+	# 	print(Fore.MAGENTA,"regenerating wordEmbeddingsDict",Fore.RESET)
 	fp = open(embeddingsFilePath,"r");
 	lines = fp.readlines();
 	d = {};
@@ -39,6 +45,8 @@ def computeWordEmbeddingsDict(embeddingsFilePath = "/Users/f002nb9/Downloads/glo
 		else:
 			vec = np.array([float(t) for t in tokens[1:]]);
 			d[word] = vec;
+	# np.save("/Users/f002nb9/Documents/f002nb9/bachelor/trumpBA/trumpDataset/npStores/wordEmbeddingsDict.npy", d)
+
 	return d;
 
 def getSumOfGloveVectorsForTweet(cleanedText,gloveDict):
