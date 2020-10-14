@@ -516,12 +516,12 @@ def tweetCountOverTime(daysPerMonth=7,globalRegularization = False):
 		if index == len(tweets)-1:
 			break;
 
-	epochs.append(tweets[startingIndex:])
+	# epochs.append(tweets[startingIndex:])
 	dates.append(str(tweets[-1][0])[:10])
 
 	showEveryNthDate = 2;
 	newDates = dates.copy()
-	while len(newDates)-newDates.count("") > 15:
+	while len(newDates)-newDates.count("") > 4:
 		newDates = [date if index % showEveryNthDate == showEveryNthDate-1 else "" for index, date in enumerate(dates[1:])];
 		showEveryNthDate += 1;
 		print("n00b")
@@ -530,17 +530,18 @@ def tweetCountOverTime(daysPerMonth=7,globalRegularization = False):
 
 	x = list(range(epochCount));
 	y = [len(epoch)/daysPerMonth for epoch in epochs];
-	plt.xticks([i for i in range(len(dates)+1)],dates);
-
+	plt.xticks([i for i in range(len(dates)) if len(dates[i]) > 1],[date for date in dates if len(date)>1],fontsize=15);
+	plt.yticks(fontsize=15)
 	fitLineCoefficients = np.polyfit(x, y, 1, full=False)
 	slope = fitLineCoefficients[0];
 	intercept = fitLineCoefficients[1]
 	pearson = pearsonCorrelationCoefficient(y, [slope*i+intercept for i in x])
-	plt.ylabel("Tweets per Day")
-	plt.xlabel("Time")
+	plt.ylabel("Tweets per Day",fontsize=15)
+	# plt.xlabel("Time")
 	plt.plot(x,[slope*i+intercept for i in x],label="ols")
-	plt.title("Tweets per Day Increases with Time; Correlation Coefficient :"+str(round(pearson,2)))
+	plt.title("Tweets per Day Increases with Time (Correlation Coefficient "+str(round(pearson,2))+")",fontsize=20)
 	plt.scatter(x,y);
+
 	plt.show();
 	exit();
 

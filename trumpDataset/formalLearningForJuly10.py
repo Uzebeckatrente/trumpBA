@@ -6,12 +6,14 @@ from .visualization import graphTwoDataSetsTogether;
 from .stats import ols;
 from .favs import getMedianFavCountPresTweets,loadnGramsWithFavsMinusMeanMedian,calculateAndStorenGramsWithFavsMinusMeanMedian
 from sklearn.linear_model import *
+import seaborn as sn
+from sklearn.svm import SVC as svc
 from sklearn.model_selection import cross_val_score;
 from .daysOfTheWeek import determineDayOfWeek,determineSegmentOfDay,determineYearOfTweet
 from sklearn.neural_network import MLPClassifier, MLPRegressor;
 import sklearn.linear_model
 from .wordEmbeddings import getSumOfVectorsForTweet, computeWordEmbeddingsDict, getSumOfGloveVectorsForTweet
-
+from sklearn.metrics import plot_confusion_matrix,confusion_matrix
 from sklearn.metrics import classification_report,r2_score,mean_squared_error
 from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
@@ -25,6 +27,72 @@ from keras import Sequential
 from keras.layers import Dense
 from scipy.stats import zscore
 
+def precisionAttenuatesWithBoxSize(classifiers,classifierNames, boxSizes, training, test):
+	scores = []
+	for numBoxes in boxSizes:
+		for classifierIndex, classifier in enumerate(classifiers):
+			if classifierIndex == 0:
+				classifier.train(training, percentageNGrams=0.3, includeWordEmbeddingMatrix=False, alpha=20, transformation="log", numBoxes=numBoxes)
+			elif classifierIndex == 1:
+				classifier.train(training,percentageNGrams = 0.35, includeWordEmbeddingMatrix = False, alpha = 1,transformation="log", numIterationsMax = 200,numBoxes=numBoxes)
+			elif classifierIndex == 2:
+				classifier.train(training, percentageNGrams=0.35, includeWordEmbeddingMatrix=False, alpha=10, transformation="log", numBoxes=numBoxes)
+			score = classifier.test(test, title="All Years Test Data", crossVal=True, targetNames=["box " + str(i) for i in range(numBoxes)]);
+			try:
+				scores[classifierIndex].append(score)
+			except:
+				scores.append([score])
+
+
+	for classifierIndex in range(len(classifiers)):
+		c = randomHexColor()
+		xes = [i for i in range(len(scores[classifierIndex]))]
+		plt.scatter(xes,scores[classifierIndex],label=classifierNames[classifierIndex],c=c)
+		fitLineCoefficients = np.polyfit(xes, scores[classifierIndex], 1, full=False)
+		slope = fitLineCoefficients[0];
+		intercept = fitLineCoefficients[1]
+		plt.ylabel("Precision of Classification", fontsize=15)
+		plt.legend()
+		# plt.xlabel("Time")
+		plt.plot(xes, [0+ slope * x + intercept for x in xes],color=c)
+	xes = [i for i in range(len(scores[0]))]
+	plt.xticks(xes,[str(boxSize) for boxSize in boxSizes],fontsize=10);
+	plt.xlabel("Number of Bins")
+	plt.title("Precision Attenuates as Box Size Increases",fontsize=20);
+	plt.show()
+
+
+def precisionAttenuatesWithBoxWidth(classifiers,classifierNames, boxSizes, training, test):
+	scores = []
+	for boxSize in boxSizes:
+		for classifierIndex, classifier in enumerate(classifiers):
+			if classifierIndex == 0:
+				classifier.train(training,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=0.001,transformation="poisson",boxSize=boxSize);
+			elif classifierIndex == 1:
+				classifier.train(training,percentageNGrams=0.5,includeWordEmbeddingMatrix=True,alpha=0.0001,transformation="poisson",boxSize=boxSize);
+			score = classifier.test(test, title="All Years Test Data", crossVal=True, targetNames=["box " + str(i) for i in range(boxSize)]);
+			try:
+				scores[classifierIndex].append(score)
+			except:
+				scores.append([score])
+
+
+	for classifierIndex in range(len(classifiers)):
+		c = randomHexColor()
+		xes = [i for i in range(len(scores[classifierIndex]))]
+		plt.scatter(xes,scores[classifierIndex],label=classifierNames[classifierIndex],c=c)
+		fitLineCoefficients = np.polyfit(xes, scores[classifierIndex], 1, full=False)
+		slope = fitLineCoefficients[0];
+		intercept = fitLineCoefficients[1]
+		plt.ylabel("Precision of Classification", fontsize=15)
+		plt.legend()
+		# plt.xlabel("Time")
+		plt.plot(xes, [0+ slope * x + intercept for x in xes],color=c)
+	xes = [i for i in range(len(scores[0]))]
+	plt.xticks(xes,[str(boxSize) for boxSize in boxSizes],fontsize=10);
+	plt.xlabel("Box Sizes")
+	plt.title("Precision Attenuates as Box Size Decreases",fontsize=20);
+	plt.show()
 
 def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targetMatrix, dataSetNames, acceptableRange=0.3, doGraph=False):
 	if doGraph:
@@ -42,7 +110,7 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 	for dataSetIndex in range(len(dataSetNames)):
 		print("di: ",dataSetIndex)
 		predictions = predictionsEs[dataSetIndex]
-		custom_lines.append(Line2D([0], [0], lw=4,linestyle="none",markersize=10, alpha=0.6,marker="v", color='#000000'))
+		custom_lines.append(Line2D([0], [0], lw=4,linestyle="none",markersize=10, alpha=0.6,marker=markers[dataSetIndex], color='#000000'))
 		labels.append(dataSetNames[dataSetIndex])
 		for tweetIndex in range(len(testTweets)):
 			print("ti: ",tweetIndex);
@@ -59,9 +127,9 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 			numInRange += int(inAcceptableRange)
 			if doGraph:
 				if inAcceptableRange:
-					plt.scatter([tweetIndex], [prediction], c='#00ff00', marker=markers[dataSetIndex])
+					plt.scatter([tweetIndex], [prediction], c='#00ff00', marker=markers[dataSetIndex],s=16)
 				else:
-					plt.scatter([tweetIndex], [prediction], c='#ff0000', marker=markers[dataSetIndex])
+					plt.scatter([tweetIndex], [prediction], c='#ff0000', marker=markers[dataSetIndex],s=16)
 				if dataSetIndex == 0:
 					acceptableRect = patches.Rectangle((tweetIndex, acceptableMin), 1, acceptableMax - acceptableMin, linewidth=0.5, alpha=0.32, color="#aabbcc")
 					plt.gca().add_patch(acceptableRect)
@@ -73,41 +141,48 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 		plt.plot(xes, targetMatrix, 'go-', markersize=0.1, c='#0000ff', label='Actual Counts')
 		plt.ylim(min(targetMatrix) - 1, max(targetMatrix) + 1);
 		# custom_lines.append(Line2D([0], [0], lw=4, alpha=0.32, color="#aabbcc"))
-		labels.extend(["In Range","Out of Range"])
-		custom_lines.extend([Line2D([0], [0], lw=4, alpha=0.6, color='#00ff00'),Line2D([0], [0], lw=4, alpha=0.6, color='#ff0000')])
-		plt.legend(custom_lines, labels);
-		plt.title('Pure Regression of Each Model',size=20)
+		labels.extend(["In Range","Out of Range","Actual Favourite Counts"])
+		custom_lines.extend([Line2D([0], [0], lw=4, alpha=0.6, color='#00ff00'),Line2D([0], [0], lw=4, alpha=0.6, color='#ff0000'),Line2D([0], [0], lw=4, alpha=0.6, color='#0000ff')])
+		plt.legend(custom_lines, labels,prop={'size': 12});
+		plt.xticks([])
+		plt.ylabel("Favourite Counts",fontsize=18)
+		plt.yticks(fontsize=15)
+		plt.title('Pure Regression of Each Model on Test Data',size=20)
 
 		plt.show()
 	return numInRange / len(testTweets)
 
 def fourModelComparisonRegression(trainingLastYear,testLastYear,allPresTweetsFavCountAndCleanedTextByYear5):
+	testLastYear.sort(key = lambda tup: tup[0])
 	olsRegressor = RegressionModel("ols")
 	mlpRegressor = RegressionModel("mlpRegressor")
 	mlPoisson = RegressionModel("mlPoisson");
 	poisson = RegressionModel("poisson");
 
-	olsRegressor.train(trainingLastYear, percentageNGrams=0.35, includeWordEmbeddingMatrix=True, alpha=10)
-	mlpRegressor.train(trainingLastYear, percentageNGrams=0.25, includeWordEmbeddingMatrix=True, alpha=100000, numIterationsMax=500);
-	poisson.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=1000);
-	mlPoisson.train(trainingLastYear, percentageNGrams=0.5, includeWordEmbeddingMatrix=True, alpha=100);
+	olsRegressor.train(trainingLastYear, percentageNGrams=0, includeWordEmbeddingMatrix=False, alpha=10)
+	mlpRegressor.train(trainingLastYear, percentageNGrams=0.25, includeWordEmbeddingMatrix=False, alpha=100000, numIterationsMax=500);
+	poisson.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=False,alpha=1000);
+	mlPoisson.train(trainingLastYear, percentageNGrams=0.5, includeWordEmbeddingMatrix=False, alpha=100);
 
 
 
-	predictionMatrixOLS, targetMatrix = olsRegressor.createDataAndTargetMatrices(testLastYear)
+	predictionMatrixOLS, targetMatrix = olsRegressor.createDataAndTargetMatrices(testLastYear,training=False)
 	predictionsOls = olsRegressor.model.predict(predictionMatrixOLS);
 
-	predictionMatrixMLP, _ = mlpRegressor.createDataAndTargetMatrices(testLastYear)
+	predictionMatrixMLP, _ = mlpRegressor.createDataAndTargetMatrices(testLastYear,training=False)
 	predictionsMLP = mlpRegressor.model.predict(predictionMatrixMLP);
 
-	predictionMatrixPoisson, _ = poisson.createDataAndTargetMatrices(testLastYear)
+	predictionMatrixPoisson, _ = poisson.createDataAndTargetMatrices(testLastYear,training=False)
 	predictionsPoisson = poisson.model.predict(predictionMatrixPoisson);
 
-	predictionMatrixMLPoisson, _ = mlPoisson.createDataAndTargetMatrices(testLastYear)
+	predictionMatrixMLPoisson, _ = mlPoisson.createDataAndTargetMatrices(testLastYear,training=False)
 	predictionsMLPoisson = mlPoisson.model.predict(predictionMatrixMLPoisson);
 
 	predictionsEs = [predictionsOls,predictionsMLP,predictionsPoisson,predictionsMLPoisson];
 	datasetNames = ["Ridge Regression","Multilayer Perceptron","Poisson Regression","Poisson MLP"]
+	#
+	# predictionsEs = [predictionsOls];
+	# datasetNames = ["Ridge Regression"];
 
 	graphConfusionMatrixContinuousMultipleInputs(testLastYear, predictionsEs, targetMatrix, datasetNames, acceptableRange=0.3, doGraph=True);
 
@@ -137,6 +212,7 @@ class RegressionModel():
 		'''
 		tweetsHash = hashTweets(trainingTweets)
 		try:
+
 			return np.load("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix" + tweetsHash + ".npy")
 		except:
 			pass;
@@ -205,7 +281,7 @@ class RegressionModel():
 		np.save("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix"+tweetsHash+".npy", wordEmbeddingMatrix)
 		return wordEmbeddingMatrix
 
-	def createDataAndTargetMatrices(self, tweets, randomness= False):
+	def createDataAndTargetMatrices(self, tweets,training = True, randomness= False):
 		'''
 		•n-grams (m-hot)
 		•all-caps percentage
@@ -230,6 +306,7 @@ class RegressionModel():
 		sizeOfBigMatrix = 0;
 		sizeOfBigMatrix += len(self.allNGrams)
 		if self.includeWordEmbeddingMatrix:
+			print("hiya!")
 			myWordEmbeddingMatrix = self.computeWordEmbeddingMatrix(tweets);
 			sizeOfBigMatrix += myWordEmbeddingMatrix.shape[1];
 			# wordEmbeddingsDict = computeWordEmbeddingsDict()
@@ -238,16 +315,22 @@ class RegressionModel():
 				sizeOfBigMatrix += 1;
 		bigMatrix = np.zeros((len(tweets),sizeOfBigMatrix));
 
-		years = 5;
+		years = 4;
 		times = [t[4] for t in tweets];
 		minTime = min(times);
 		maxTime = max(times);
 
-		if self.transformation == "log":
-			logs = [np.log(tweet[0]) for tweet in tweets];
-			zscores = zscore(logs);
+
+		logs = [np.log(np.log(tweet[0])) if np.log(tweet[0]) > 0 else 0 for tweet in tweets];
+		zscores = [round(zs,2) for zs in zscore(logs)];
+
+		poissonFavs = [int(round(t[0]/self.boxSize,0)) for t in tweets];
+
+
+		if training:
 			minZscore = np.min(zscores)
-			maxZscore = np.min(zscores)
+			maxZscore = np.max(zscores)
+			self.starts = [round(i * (maxZscore - minZscore) / (self.numBoxes) + minZscore, 2) for i in range(self.numBoxes + 1)]
 
 		favs = [t[0] for t in tweets];
 		maxFav = np.max(favs);
@@ -319,14 +402,35 @@ class RegressionModel():
 
 		#####fill target
 			if self.task == "class":
+				if self.transformation == "log":
+					myZscore = zscores[tweetIndex];
+					if self.numBoxes != -1:
+						try:
 
-				#classification!
-				if tweet[0]> self.twoClassBarrierCount:
-					targetMatrix[tweetIndex] = 1
-				# elif tweet[0] < self.twoClassBarrierCountUnder:
-				# 	targetMatrix[tweetIndex] = -10;
+							# starts = [(((maxZscore - minZscore)) * i / self.numBoxes - (maxZscore - minZscore)/2) for i in range(self.numBoxes + 1)];
+							myBox = 0;
+							if myZscore < self.starts[0]:
+								pass;
+							elif myZscore > self.starts[-1]:
+								myBox = len(self.starts-1);
+							else:
+								while not self.starts[myBox] <= myZscore <= self.starts[myBox + 1]:
+									myBox += 1;
+							targetMatrix[tweetIndex] = myBox
+						except:
+							print(self.starts,myZscore)
+							raise(Exception("n00b"))
+				elif self.transformation == "poisson":
+
+					targetMatrix[tweetIndex] = poissonFavs[tweetIndex]
+
 				else:
-					targetMatrix[tweetIndex] = 0;
+					#binary classification!
+					classI = 0;
+					while tweet[0] >= self.twoClassBarrierCounts[classI+1]:
+						classI += 1;
+					print("classI: ",classI)
+					targetMatrix[tweetIndex] = classI;
 			else:
 				#regression!
 				#todo: richte boxes ein
@@ -409,29 +513,36 @@ class RegressionModel():
 		# return x;
 		return K.exp(x);
 
-	def normalizeNegPos(self,tweets, distancePercentileFromSplit=-1):
+	def normalizeClassSizes(self, tweets, distancePercentileFromSplit=-1):
 		favs = [t[0] for t in tweets];
 		favs.sort();
-		indexOfPercentileCount = favs.index(self.twoClassBarrierCount);
-		if distancePercentileFromSplit != -1:
-			bottomIndex = indexOfPercentileCount - int(indexOfPercentileCount * distancePercentileFromSplit);
-			topIndex = indexOfPercentileCount + int(indexOfPercentileCount * (1 - distancePercentileFromSplit))
-			# trainingTweets = trainingTweets[:bottomIndex] + trainingTweets[topIndex:];
+		# indexOfPercentileCount = favs.index(self.twoClassBarrierCount);
+		# if distancePercentileFromSplit != -1:
+		# 	bottomIndex = indexOfPercentileCount - int(indexOfPercentileCount * distancePercentileFromSplit);
+		# 	topIndex = indexOfPercentileCount + int(indexOfPercentileCount * (1 - distancePercentileFromSplit))
+		# 	# trainingTweets = trainingTweets[:bottomIndex] + trainingTweets[topIndex:];
 
-		theseNegatives = [t for t in tweets if t[0] < self.twoClassBarrierCount]
-		thesePositives = [t for t in tweets if t[0] >= self.twoClassBarrierCount]
+		theseClassElements = []
+		for i in range(len(self.twoClassBarrierCounts)-1):
+			theseElements = [t for t in tweets if self.twoClassBarrierCounts[i] <= t[0] < self.twoClassBarrierCounts[i+1]]
+			theseClassElements.append(theseElements);
 
-		negativeTrainingIDX = np.random.choice(len(theseNegatives), min(len(theseNegatives), len(thesePositives) * self.percentileNegativePositive), replace=False);
-		myNegs = []
-		for i in range(len(theseNegatives)):
-			if i in negativeTrainingIDX:
-				myNegs.append(theseNegatives[i])
-		lennus = ((len(myNegs), len(thesePositives)));
-		print(Fore.MAGENTA, "ratio of positives to negatives in learning sample: ", lennus, Fore.RESET)
-		trainingTweets = myNegs + thesePositives;
+
+		minClassSize = np.min([len(c) for c in theseClassElements]);
+		classTrainingIDX = [np.random.choice(len(c), minClassSize, replace=False) for c in theseClassElements]
+		theseClassElementsTaken = []
+		for classNumber, theseClassesTakenIndices in enumerate(classTrainingIDX):
+			theseClassElementsTaken.append([theseClassElements[classNumber][i] for i in theseClassesTakenIndices])
+
+		trainingTweets = []
+		for classElements in theseClassElementsTaken:
+			trainingTweets += classElements
+
+		# print(Fore.MAGENTA, "ratio of positives to negatives in learning sample: ", Fore.RESET)
+		# trainingTweets = myNegs + thesePositives;
 		return trainingTweets;
 
-	def train(self,trainingTweets,extraParamDict="default",hiddenLayers = (3,),allCapsBoost=0.5,alpha=0.1,percentileNegativePositive=1,percentileSplit = 0.75,includeWordEmbeddingMatrix=True, twoClassBarrierCount=-1,distancePercentileFromSplit = 0.4, percentageNGrams = 0.5, transformation = None, numBoxes = 5, numIterationsMax = 500,learningRate = 1):
+	def train(self, trainingTweets, extraParamDict="default", hiddenLayers = (3,), allCapsBoost=0.5, alpha=0.1, percentileNegativePositive=1, percentileSplits = (0.5,), includeWordEmbeddingMatrix=True, twoClassBarrierCount=-1, distancePercentileFromSplit = 0.4, percentageNGrams = 0.5, transformation = None, numBoxes = 5, numIterationsMax = 500, learningRate = 1,boxSize = 100000):
 		'''
 
 		:param trainingTweets: tweets in format ["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"]
@@ -440,7 +551,7 @@ class RegressionModel():
 		:param allCapsBoost: extra weight for words that are spelled all-caps
 		:param alpha: regularization parameter
 		:param percentileNegativePositive: ratio of positive to negative tweets in training set, for classification
-		:param percentileSplit: fulcrum for 2-class classification
+		:param percentileSplits: fulcrum for 2-class classification
 		:param includeWordEmbeddingMatrix: boolean, if we are using word embeddings in our trainer (later becomes a matrix)
 		:param twoClassBarrierCount: private parameter, normally set to -1, otherwise to indicate the count used for the fulcrum
 		:param distancePercentileFromSplit: not implemented, would indicate the training tweets which we ignore that are close to the fulcrum
@@ -462,26 +573,28 @@ class RegressionModel():
 				alpha = 4;
 			if allCapsBoost == None:
 				allCapsBoost = 0.5
-		if self.learner == "poisson":
+		if self.learner == "poisson" or self.learner == "poissonClassifier":
 			self.model = PoissonRegressor(alpha=alpha)
-		elif self.learner == "ols":
+		elif self.learner == "ols" or self.learner == "olsClassifier":
 			self.model = Ridge(alpha=alpha);
+		elif self.learner == "svm":
+			self.model = svc(C=alpha,verbose=True)
 		elif self.learner == "mlpClassifier":
-			self.model = MLPClassifier(hidden_layer_sizes=hiddenLayers,alpha=alpha);
+			self.model = MLPClassifier(hidden_layer_sizes=hiddenLayers,alpha=alpha,max_iter=numIterationsMax,verbose=True,);
 		elif self.learner == "mlpRegressor":
 			self.model = MLPRegressor(alpha=alpha,max_iter = numIterationsMax,hidden_layer_sizes=hiddenLayers,verbose=True,learning_rate_init=learningRate,learning_rate="adaptive");
 			print("nalpha: ",alpha)
 
 			# self.model = MLPRegressor(random_state=1,hidden_layer_sizes=(200), max_iter=10000);
 			# self.model = Sequential();
-		elif self.learner == "mlPoisson":
+		elif self.learner == "mlPoisson" or self.learner == "mlPoissonClassifier":
 			self.model = Sequential();
 		else:
 			alpha = 0.5;
 
 
 		if extraParamDict == "default":
-			extraParamDict={"allCapsPercentage": True, "timeOfDay": True, "dayOfWeek": True,"yearOfTweeting":False, "length": True}
+			extraParamDict={"allCapsPercentage": True, "timeOfDay": True, "dayOfWeek": True,"yearOfTweeting":True, "length": True}
 		for key, value in extraParamDict.items():
 			if type(value) != bool or key not in ["allCapsPercentage","timeOfDay", "dayOfWeek","yearOfTweeting","length"]:
 				raise Exception("extraParamDict formatting is wrong!")
@@ -494,13 +607,14 @@ class RegressionModel():
 		self.includeWordEmbeddingMatrix = includeWordEmbeddingMatrix;
 		self.transformation = transformation;
 		self.percentileNegativePositive = percentileNegativePositive;
-		self.percentileSplit = percentileSplit;
+		self.percentileSplit = percentileSplits;
 		if twoClassBarrierCount == -1:
-			self.twoClassBarrierCount = trainingTweets[int(len(trainingTweets) * self.percentileSplit)][0];
+			self.twoClassBarrierCounts = [0]+[trainingTweets[int(len(trainingTweets) * self.percentileSplit[i])][0] for i in range(len(self.percentileSplit))]+[10000000];
 
 		self.extraParamDict = extraParamDict;
 		self.allCapsBoost = allCapsBoost;
 		self.numBoxes = numBoxes;
+		self.boxSize = boxSize;
 
 
 
@@ -508,7 +622,8 @@ class RegressionModel():
 
 		if self.task == "class" and self.percentileNegativePositive != -1:
 
-			trainingTweets = self.normalizeNegPos(trainingTweets,-1);
+			trainingTweets = self.normalizeClassSizes(trainingTweets, -1);
+			print(trainingTweets);
 
 		allNGrams = set();
 		self.nGramIndices = {}
@@ -559,15 +674,16 @@ class RegressionModel():
 
 		# bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets,[[np.log(t[0]) for t in trainingTweets],[(t[0]/100000) for t in trainingTweets]]);
 
-		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets);
+		bigMatrix, targetMatrix = self.createDataAndTargetMatrices(trainingTweets,training=True);
 
 		print("dims: ", bigMatrix.shape);
+		print(targetMatrix)
 
 
 
 		startTime = time.time()
 
-		if self.learner == "mlPoisson":
+		if self.learner == "mlPoisson" or self.learner == "mlPoissonClassifier":
 			# bigMatrix = np.ones((1000,1))
 			self.model.add(Dense(hiddenLayers[0], input_dim=bigMatrix.shape[1], activation='sigmoid', use_bias=True,kernel_regularizer=regularizers.l2(alpha)))
 			for h in range(1,len(hiddenLayers)):
@@ -689,11 +805,112 @@ class RegressionModel():
 		return numInRange/len(testTweets)
 
 
+	def graphClassification(self, predictionMatrix, predictions, targetMatrix, dataset,targetNames, doGraph = False):
+
+		if doGraph:
+			fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+			fig.subplots_adjust(left=0.06, right=0.94)
 
 
 
 
-	def test(self,testTweets,title="",distancePercentileFromSplit = 0, crossVal = False):
+		maxClass = int(max(round(np.max(targetMatrix),0),round(np.max(predictions),0)))
+		print("maximus: ", np.max(targetMatrix), np.max(predictions))
+		minClass = int(min(np.min(targetMatrix), np.min(predictions)))
+
+		correctPredictionsAggregator = [0 for _ in range(maxClass+1)]
+		predictionsAggregator = [0 for _ in range(maxClass+1)]
+
+		shouldHaveBeenFirstIndexActuallyWasSecondIndex = []
+		for i in range(maxClass+1):
+			shouldHaveBeenFirstIndexActuallyWasSecondIndex.append([]);
+			for _ in range(maxClass+1):
+				shouldHaveBeenFirstIndexActuallyWasSecondIndex[i].append(0);
+		print("uniqueness: ",np.unique(targetMatrix))
+
+
+
+
+		for i in range(predictions.shape[0]):
+			prediction = int(round(float(predictions[i]),0));
+			target = int(targetMatrix[i][0]);
+			try:
+				shouldHaveBeenFirstIndexActuallyWasSecondIndex[target][prediction] += 1;
+			except:
+				print(target, prediction,shouldHaveBeenFirstIndexActuallyWasSecondIndex)
+				raise(Exception("n00b"))
+			prod = prediction * target;
+
+			if np.isclose(prediction,target):
+				correctPredictionsAggregator[target] += 1;
+				if doGraph:
+					plt.scatter(i, prediction, c="#00ff00");
+
+			else:
+				if doGraph:
+					plt.scatter(i,prediction,c="#ff0000");
+
+			predictionsAggregator[target] += 1;
+		accuracy = np.mean([correctPredictionsAggregator[i]/predictionsAggregator[i] for i in range(len(correctPredictionsAggregator)) if predictionsAggregator[i] > 0])
+		# accuracy = 0.5*(correctPredictionsAggregator[0]/predictionsAggregator[0])+0.5*(correctPredictionsAggregator[1]/predictionsAggregator[1]);
+		if doGraph:
+			title = "Classification on " + dataset + " using " + self.learner + "; Classification Accuracy " + str(round(accuracy,2))
+			plt.title(title)
+			plt.show()
+
+			N = len(correctPredictionsAggregator)
+			ind = np.arange(N)  # the x locations for the groups
+			width = 1/(len(correctPredictionsAggregator)+1)  # the width of the bars
+
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+
+			bars = [];
+			barLabels = []
+			indexLabels = []
+			for shouldHaveBeenThisClass in range(len(shouldHaveBeenFirstIndexActuallyWasSecondIndex)):
+				actualyWasThisClass = shouldHaveBeenFirstIndexActuallyWasSecondIndex[shouldHaveBeenThisClass];
+				bars.append(ax.bar(ind+width*shouldHaveBeenThisClass+width*0.5,actualyWasThisClass,width))
+				barLabels.append("Classifier Guessed "+str(shouldHaveBeenThisClass))
+				indexLabels.append("Target: "+str(shouldHaveBeenThisClass))
+			ax.bar(ind+width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex)*0.5,[np.sum(x) for x in shouldHaveBeenFirstIndexActuallyWasSecondIndex],width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex),alpha = 0.5,label="Actual Occurence Count for Each Class")
+
+			ax.set_ylabel('Target/Prediction Count for Each Class')
+			ax.set_xticks(ind + width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex)*0.5)
+			ax.set_xticklabels(indexLabels)
+			ax.legend(bars,barLabels)
+
+			# def autolabel(rects):
+			# 	for rect in rects:
+			# 		h = rect.get_height()
+			# 		ax.text(rect.get_x() + rect.get_width() / 2., 1.05 * h, '%d' % int(h),
+			# 				ha='center', va='bottom')
+			#
+			# autolabel(rects1)
+			# autolabel(rects2)
+			# autolabel(rects3)
+
+			plt.show()
+
+
+
+			data = confusion_matrix(predictions, targetMatrix)
+			for i in range(len(predictions)):
+				print(predictions[i],targetMatrix[i]);
+			df_cm = pd.DataFrame(data, columns=targetNames, index=targetNames)
+			df_cm.index.name = 'Actual'
+			df_cm.columns.name = 'Predicted'
+			plt.figure(figsize=(10, 7))
+			sn.set(font_scale=1.4)  # for label size
+			sn.heatmap(df_cm, cmap="Blues", annot=True, annot_kws={"size": 16},fmt='d')
+			plt.title(title)
+			plt.show()
+
+		return accuracy
+
+
+
+	def test(self,testTweets,title="",distancePercentileFromSplit = 0, targetNames = ("0-30","70-100"),crossVal = False):
 
 		testTweets.sort(key=lambda tup: tup[0]);
 
@@ -709,66 +926,40 @@ class RegressionModel():
 		# 	print("post: ", len(testTweets));
 		numCorrect = 0;
 
-		predictionMatrix = np.zeros((len(testTweets), len(self.allNGrams)));
-		print("predicting dims: ", predictionMatrix.shape);
+
 
 		# extraParams = self.getExtraParams(testTweets,self.extraParamNum);
 
 
 		# predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets,[[np.log(t[0]) for t in testTweets],[(t[0]/100000) for t in testTweets]]);
 
-		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets)
+		predictionMatrix, targetMatrix = self.createDataAndTargetMatrices(testTweets,training=False)
 
 		print("targetMaxAndMin ",min(targetMatrix),max(targetMatrix));
 		actualFavs = [t[0] for t in testTweets];
 
 		predictions = self.model.predict(predictionMatrix);
-		# print("predictions: ",predictions);
+		print("predictions: ",predictions);
 		# plt.plot([i for i in range(len(predictions))],predictions);
 		# plt.show();
 
 		if self.task == "class":
 
-			correctPredictionsAggregator = {0: 0, 1: 0};
-			predictionsAggregator = {0:0,1:0};
 
-
-			for i in range(predictions.shape[0]):
-				prediction = predictions[i];
-				target = targetMatrix[i][0]
-				prod = prediction * target;
-
-
-				if prediction == 0 and target == 0 or prediction > 0 and target > 0:
-					correctPredictionsAggregator[target] += 1;
-
-				predictionsAggregator[target] += 1;
-			classificationAccuracy = 0.5*(correctPredictionsAggregator[0]/predictionsAggregator[0])+0.5*(correctPredictionsAggregator[1]/predictionsAggregator[1]);
-		elif self.learner == "mlPoisson":
-			print("lennus: ",targetMatrix.shape,predictions.shape)
-			correlationCoefficient = r2_score(targetMatrix,predictions);
-			mse = mean_squared_error(targetMatrix,predictions)
-		else:
-			correlationCoefficient = r2_score(targetMatrix,predictions);
-			mse = mean_squared_error(targetMatrix, predictions)
-			# score = self.model.score(predictionMatrix,np.ravel(targetMatrix));
-		#
-		if self.task == "class":
-			print(Fore.MAGENTA,"classification report: \n",Fore.RESET);
-			print(classification_report(targetMatrix, predictions, target_names=["under " + str(self.percentileNegativePositive), "over " + str(self.percentileNegativePositive)]));
-			print("and that was the classification report. Good night!")
-		else:
+			classificationAccuracy = self.graphClassification(predictionMatrix,predictions,targetMatrix,title,targetNames=targetNames,doGraph=not crossVal)
 			print(Fore.MAGENTA, "classification report: \n", Fore.RESET);
-			print(r2_score(targetMatrix, predictions));
+			print("classificationAccuracy: ", classificationAccuracy)
+			# print(classification_report(targetMatrix, predictions.round(), target_names=targetNames));
 			print("and that was the classification report. Good night!")
-		print("predictions: ",predictions)
-		if self.task == "reg":
+
+			return classificationAccuracy
+		else:
+			correlationCoefficient = r2_score(targetMatrix,predictions);
 			print("rex regis")
 			percentWithinRange = self.graphConfusionMatrixContinuous(testTweets,predictions,targetMatrix,correlationCoefficient,title,doGraph=not crossVal,acceptableRange=0.3)
 			# percentWithinRange = self.graphConfusionMatrixDiscrete(testTweets, predictions, targetMatrix, correlationCoefficient, title)
 			return correlationCoefficient, percentWithinRange
-		else:
-			return classificationAccuracy
+
 		# return "new: ",score, "old way: ",scoreOldWay;
 
 
@@ -1199,7 +1390,7 @@ class RegressionModel():
 
 		percentagesPoss=[0,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5];
 		if alphasPoss == None:
-			alphasPoss = [1,10,50,100]
+			alphasPoss = [0.1,1,10,50,100]
 		for index,percentage in enumerate(percentagesPoss):
 			for alphaIndex, alpha in enumerate(alphasPoss):
 				scoresDictCorrelationCoefficient[(percentage,alpha)] = [];
@@ -1211,48 +1402,70 @@ class RegressionModel():
 
 
 
-					self.train(trainFlat,percentageNGrams=percentage,alpha=alpha,numIterationsMax=1500);
-					correlationCoefficient, percentWithinRange = self.test(holdout,crossVal=True);
+					self.train(trainFlat,percentageNGrams=percentage,alpha=alpha,numIterationsMax=1500,includeWordEmbeddingMatrix=False,percentileSplits=(0.9,));
+					if self.task == "reg":
+						correlationCoefficient, percentWithinRange = self.test(holdout,crossVal=True);
+						scoresDictCorrelationCoefficient[(percentage, alpha)].append(correlationCoefficient);
+						scoresDictPercentageWithinRange[(percentage, alpha)].append(percentWithinRange)
+					else:
+						accuracy = self.test(holdout, crossVal=True);
+						scoresDictCorrelationCoefficient[(percentage, alpha)].append(accuracy);
 
-					scoresDictCorrelationCoefficient[(percentage,alpha)].append(correlationCoefficient);
-					scoresDictPercentageWithinRange[(percentage, alpha)].append(percentWithinRange)
 
-				correlationCoefficient = np.mean(scoresDictCorrelationCoefficient[(percentage,alpha)])
-
-				percentWithinRange = np.mean(scoresDictPercentageWithinRange[(percentage,alpha)])
-				resultsDictCorrelationCoefficient[(percentage,alpha)] = correlationCoefficient;
-				resultsDictPercentageWithinRange[(percentage, alpha)] = percentWithinRange
-				scoresPercentageWithinRange.append(percentWithinRange);
-				scoresCorrelationCoefficient.append(percentWithinRange);
-				print(Fore.YELLOW,"percentage: ",percentage," alpha: ",alpha," (correlation coefficient, percent within range): ",correlationCoefficient, percentWithinRange, " done with: ",index/len(percentagesPoss));
+				if self.task == "reg":
+					correlationCoefficient = np.mean(scoresDictCorrelationCoefficient[(percentage,alpha)])
+					percentWithinRange = np.mean(scoresDictPercentageWithinRange[(percentage,alpha)])
+					resultsDictCorrelationCoefficient[(percentage, alpha)] = correlationCoefficient;
+					resultsDictPercentageWithinRange[(percentage, alpha)] = percentWithinRange
+					scoresCorrelationCoefficient.append(correlationCoefficient);
+					scoresPercentageWithinRange.append(percentWithinRange);
+				else:
+					accuracy = np.mean(scoresDictCorrelationCoefficient[(percentage, alpha)])
+					resultsDictCorrelationCoefficient[(percentage, alpha)] = accuracy;
+					scoresCorrelationCoefficient.append(accuracy);
+				if self.task == "reg":
+					print(Fore.YELLOW,"percentage: ",percentage," alpha: ",alpha," (correlation coefficient, percent within range): ",correlationCoefficient, percentWithinRange, " done with: ",index/len(percentagesPoss));
+				else:
+					print(Fore.YELLOW, "percentage: ", percentage, " alpha: ", alpha, " accuracy: ", accuracy, " done with: ", index / len(percentagesPoss));
 
 		bestScoreCorrelation = 0;
 		bestComboCorrelation = "";
-		bestScorePercentWithinRange = 0;
-		bestComboPercentWithinRange = "";
-		for key in resultsDictPercentageWithinRange.keys():
-			if resultsDictPercentageWithinRange[key] > bestScorePercentWithinRange:
-				bestScorePercentWithinRange = resultsDictPercentageWithinRange[key];
-				bestComboPercentWithinRange = key;
+		if self.task == "reg":
+			bestScorePercentWithinRange = 0;
+			bestComboPercentWithinRange = "";
+			for key in resultsDictPercentageWithinRange.keys():
+				if resultsDictPercentageWithinRange[key] > bestScorePercentWithinRange:
+					bestScorePercentWithinRange = resultsDictPercentageWithinRange[key];
+					bestComboPercentWithinRange = key;
+			print("best combo: ", bestComboPercentWithinRange, " with score: ", bestScorePercentWithinRange);
+			scoresPercentageWithinRange = np.array(scoresPercentageWithinRange);
+			print(scoresPercentageWithinRange)
+			resultDictPercentageWithinRangeSorted = list(resultsDictPercentageWithinRange.items())
+			resultDictPercentageWithinRangeSorted.sort(key=lambda tup: tup[1])
+			print("percentage win range ", resultDictPercentageWithinRangeSorted)
+			plt.plot([i for i in range(len(scoresPercentageWithinRange))], scoresPercentageWithinRange, label="percentage within range");
 
 		for key in resultsDictCorrelationCoefficient.keys():
 			if resultsDictCorrelationCoefficient[key] > bestScoreCorrelation:
 				bestScoreCorrelation = resultsDictCorrelationCoefficient[key];
 				bestComboCorrelation = key;
 		print("best combo: ", bestComboCorrelation, " with score: ", bestScoreCorrelation);
-		print("best combo: ", bestComboPercentWithinRange, " with score: ", bestScorePercentWithinRange);
-		scoresPercentageWithinRange = np.array(scoresPercentageWithinRange);
+
+
+
 		scoresCorrelationCoefficient = np.array(scoresCorrelationCoefficient);
-		print(scoresPercentageWithinRange)
+
 		print(scoresCorrelationCoefficient)
 		resultDictCorrelationCoefficientSorted = list(resultsDictCorrelationCoefficient.items())
 		resultDictCorrelationCoefficientSorted.sort(key = lambda tup: tup[1])
-		resultDictPercentageWithinRangeSorted = list(resultsDictPercentageWithinRange.items())
-		resultDictPercentageWithinRangeSorted.sort(key=lambda tup: tup[1])
-		print("correlation coefficietns: ",resultDictCorrelationCoefficientSorted)
-		print("percentage win range ",resultDictPercentageWithinRangeSorted)
-		plt.plot([i for i in range(len(scoresPercentageWithinRange))],scoresPercentageWithinRange,label="percentage within range");
-		plt.plot([i for i in range(len(scoresCorrelationCoefficient))], scoresCorrelationCoefficient,label="correlation coefficient");
+		if self.task == "reg":
+			print("correlation coefficietns: ",resultDictCorrelationCoefficientSorted)
+			plt.plot([i for i in range(len(scoresCorrelationCoefficient))], scoresCorrelationCoefficient, label="correlation coefficient");
+
+		else:
+			print("classification accuracies: ", resultDictCorrelationCoefficientSorted)
+			plt.plot([i for i in range(len(scoresCorrelationCoefficient))], scoresCorrelationCoefficient, label="Classification Accuracies");
+
 		plt.legend()
 		plt.show();
 		# print("Accuracy: %0.2f (+/- %0.2f)" % (scoresCorrelationCoefficient.mean(), scoresCorrelationCoefficient.std() * 2))

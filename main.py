@@ -103,6 +103,14 @@ from sklearn.model_selection import train_test_split
 np.random.seed(69)
 # compareVocabOverTime(4,minCount=250)
 allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords","tweetText"], orderBy= "publishTime asc")
+
+# favs = [t[0] for t in allPresTweetsFavCountAndCleanedText];
+# favs.sort()
+# plt.plot(favs);
+# for i in range(10):
+# 	print(favs[int(len(favs)*i/10)])
+# plt.show()
+# exit()
 # for numYears in [1,4]:
 # 	graphPopularityByWeekday([t[:5] for t in allPresTweetsFavCountAndCleanedText],years=numYears);
 # exit()
@@ -163,6 +171,38 @@ training, test, folds = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
 trainingNorm, testNorm, foldsNorm = splitTrainingTest(allPresTweetsFavCountAndCleanedText);
 allTweets = training+test;
 
+trainingLastYear3070 = trainingLastYear.copy()
+trainingLastYear3070.sort(key = lambda tup: tup[0]);
+trainingLastYear3070 = trainingLastYear3070[:int(len(trainingLastYear3070)*0.3)]+trainingLastYear3070[int(len(trainingLastYear3070)*0.7):]
+
+testLastYear3070 = testLastYear.copy()
+testLastYear3070.sort(key = lambda tup: tup[0]);
+testLastYear3070 = testLastYear3070[:int(len(testLastYear3070)*0.3)]+testLastYear3070[int(len(testLastYear3070)*0.7):]
+
+training3070 = training.copy()
+training3070.sort(key = lambda tup: tup[0]);
+training3070 = training3070[:int(len(training3070)*0.3)]+training3070[int(len(training3070)*0.7):]
+
+test3070 = test.copy()
+test3070.sort(key = lambda tup: tup[0]);
+test3070 = test3070[:int(len(test3070)*0.3)]+test3070[int(len(test3070)*0.7):]
+
+trainingLastYear1090 = trainingLastYear.copy()
+trainingLastYear1090.sort(key = lambda tup: tup[0]);
+trainingLastYear1090 = trainingLastYear1090[:int(len(trainingLastYear1090)*0.1)]+trainingLastYear1090[int(len(trainingLastYear1090)*0.9):]
+
+testLastYear1090 = testLastYear.copy()
+testLastYear1090.sort(key = lambda tup: tup[0]);
+testLastYear1090 = testLastYear1090[:int(len(testLastYear1090)*0.1)]+testLastYear1090[int(len(testLastYear1090)*0.9):]
+
+training1090 = training.copy()
+training1090.sort(key = lambda tup: tup[0]);
+training1090 = training1090[:int(len(training1090)*0.1)]+training1090[int(len(training1090)*0.9):]
+
+test1090 = test.copy()
+test1090.sort(key = lambda tup: tup[0]);
+test1090 = test1090[:int(len(test1090)*0.1)]+test1090[int(len(test1090)*0.9):]
+
 
 print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," test tweets",Style.RESET_ALL);
 
@@ -172,11 +212,19 @@ print(Fore.LIGHTRED_EX,str(len(training))," training tweets; ",str(len(test))," 
 
 
 # allCapsClassifier = AllCapsClassifier()
-newPoissonClassifier = RegressionModel("mlpClassifier");
+mlpClassifier = RegressionModel("mlpClassifier");
+
 newPoissonClassifier2 = RegressionModel("mlPoisson");
+mlPoissonClassifier = RegressionModel("mlPoissonClassifier");
 poissonRegressor = RegressionModel("poisson");
-olsClassifier = RegressionModel("ols")
+poissonClassifier = RegressionModel("poissonClassifier");
+olsRegressor = RegressionModel("ols")
+svmClassifier = RegressionModel("svm")
 mlpRegressor = RegressionModel("mlpRegressor")
+olsClassifier = RegressionModel("olsClassifier")
+
+# mlpClassifier.crossValPercentageOfGramsToTake(trainingLastYear3070+testLastYear3070)
+
 
 # wordEmbeddingMatrix = newPoissonClassifier.computeWordEmbeddingMatrix(trainingLastYear);
 # print(wordEmbeddingMatrix);
@@ -188,6 +236,22 @@ mlpRegressor = RegressionModel("mlpRegressor")
 # newPoissonClassifier.train(trainingLastYear,percentileSplit=0.75,percentileNegativePositive=-1,wordEmbeddingMatrix=False);
 # newPoissonClassifier.test(trainingLastYear,title="training",crossVal=False);
 # scoreNew = newPoissonClassifier.test(testLastYear, title="test",crossVal=False);
+
+# olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10,transformation="log",numBoxes=5)
+# scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
+# exit()
+# precisionAttenuatesWithBoxSize([svmClassifier,mlpClassifier,olsClassifier],["SVM","MLP","RR"],[2,3,4,5,8,11,14,17,20,40],trainingLastYear,testLastYear)
+precisionAttenuatesWithBoxWidth([poissonClassifier,mlPoissonClassifier],["poisson","MLPoisson"],[400000,200000,100000,75000,50000,20000,10000],trainingLastYear,testLastYear)
+mlPoissonClassifier.train(trainingLastYear,percentageNGrams=0.5,includeWordEmbeddingMatrix=True,alpha=0.0001,transformation="poisson",boxSize=100000);
+mlPoissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+
+poissonClassifier.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=0.001,transformation="poisson",boxSize=100000);
+scoreNew2 = poissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+
+# mlpClassifier.train(trainingLastYear, percentageNGrams=0.35, includeWordEmbeddingMatrix=False, alpha=1, transformation="log", numIterationsMax=210, numBoxes=5)
+#
+# scoreNew = mlpClassifier.test(testLastYear, title="MLP Classifier All Years Test Data",crossVal=False,targetNames=("box "+str(i) for i in range(5)));
+# scoreNew = mlpClassifier.test(trainingLastYear, title="All Years Training Data",crossVal=False,targetNames=("box "+str(i) for i in range(5)));
 
 
 # print("XVAL on neg/pos ratio for last year")
@@ -209,6 +273,16 @@ mlpRegressor = RegressionModel("mlpRegressor")
 '''
 EWIGEN
 '''
+
+
+# mlpClassifier.train(training, percentageNGrams=0.35, includeWordEmbeddingMatrix=False, alpha=1, numIterationsMax=200, percentileSplits=(0.1,0.9,));
+# scoreNew2 = mlpClassifier.test(test, title="Test Data Set Final Year",crossVal=False,targetNames=("0-10","90-100"));
+# scoreNew2 = mlpClassifier.test(test, title="test wordEmbeddingMatrix=False",crossVal=False,targetNames=("0-10","90-100"));
+
+# svmClassifier.train(training3070,percentageNGrams=0.3,includeWordEmbeddingMatrix=False,alpha=20)
+# scoreNew = svmClassifier.test(test3070, title="All Years Test Data",crossVal=False);
+# scoreNew = svmClassifier.test(training3070, title="All Years Training Data",crossVal=False);
+
 # olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10)
 # scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
 #
@@ -237,10 +311,11 @@ EWIGEN
 # scoreNew2 = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
 # newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
 
-fourModelComparisonRegression(trainingLastYear,testLastYear,allPresTweetsFavCountAndCleanedTextByYear5)
+training
+fourModelComparisonRegression(training,test,allPresTweetsFavCountAndCleanedText)
 exit()
 '''
-End Ewigen
+End EWIGEN
 '''
 
 

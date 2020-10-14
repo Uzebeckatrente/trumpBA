@@ -58,6 +58,8 @@ def getSumOfGloveVectorsForTweet(cleanedText,gloveDict):
 			totalTokens += 1;
 		except:
 			continue;
+	if totalTokens == 0:
+		return summy
 	summy /= totalTokens
 	return summy;
 
