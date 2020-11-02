@@ -154,12 +154,12 @@ def mainTrumpLDA(tweets):
 	for topicNum in favCountsByTopic.keys():
 		meanFavCount = np.mean(favCountsByTopic[topicNum]);
 		medianFavCount = np.median(favCountsByTopic[topicNum]);
-		topicNames.append(str(topicNum) + "(count "+str(len(favCountsByTopic[topicNum]))+");\nmean: "+str(round(meanFavCount,1))+ ";\nmedian:" + str(round(medianFavCount,1)));
+		topicNames.append("Topic " + str(topicNum) + " (count "+str(len(favCountsByTopic[topicNum]))+")\nmean FavCount: "+str(int(round(meanFavCount,0)))+ "\nmedian FavCount:" + str(int(round(medianFavCount,0))));
 		favCountsByTopicList.append(favCountsByTopic[topicNum]);
 
 
 
-	boxAndWhiskerForKeyWordsFavs(topicNames,favCountsByTopicList,np.mean(favCounts),"topics favCounts (supposedly)")
+	boxAndWhiskerForKeyWordsFavs(topicNames,favCountsByTopicList,np.mean(favCounts),"LDA With Two Topics And The Corresponding Popularity")
 	# plt.show();
 
 	for i in range(len(favCountsByTopicList)):
@@ -171,7 +171,8 @@ def mainTrumpLDA(tweets):
 
 	plt.plot([0,1],[np.mean(favCounts),np.mean(favCounts)],label="mean FavCounts");
 	plt.plot([0, 1], [np.median(favCounts), np.median(favCounts)], label="median FavCounts");
-	plt.legend();
+	plt.legend(fontsize=20);
+	plt.yticks(fontsize=20)
 	plt.title("Fav Count Distribution for Topics (Unsupervised LDA)")
 	plt.show();
 

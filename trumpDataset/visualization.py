@@ -171,15 +171,16 @@ def historgramFavCounts(favCounts):
 
 
 
-def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,title):
-	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
-	fig.subplots_adjust(left=0.06, right=0.94)
+def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,title,yLabel = None):
+
 
 	data = favsForTweetsWithkeyword
 	# y = data.mean(axis=0)
 
-	x = [i*3 for i in range(len(keywords))]
-	favX = [i*3 for i in range(-1,len(keywords)+1)]
+	x = [i*3-3 for i in range(len(keywords))]
+	favX = [i*3 for i in range(-1,len(keywords)-1)]
+	favX[0] += -1
+	favX[-1] += 1
 
 	# Plot a line between the means of each dataset
 	# plt.plot(x, y, 'b-')
@@ -188,8 +189,11 @@ def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,titl
 
 	plt.plot(favX,[avgFav]*len(favX),linestyle='--',label="Average for whole Dataset")
 	plt.boxplot(data, positions=x, notch=False,showfliers=True)
-	plt.title(title)
-	plt.legend()
+	plt.title(title,fontsize=20)
+	plt.legend(fontsize=15)
+	plt.yticks(fontsize=15)
+	if yLabel != None:
+		plt.ylabel(yLabel,fontsize=15)
 
-	plt.xticks(x,keywords)
+	plt.xticks(x,keywords,fontsize=14)
 	plt.show()

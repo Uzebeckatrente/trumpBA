@@ -30,7 +30,7 @@ mydb = mysql.connector.connect(host="localhost",user="root",passwd="felixMySQL",
 mycursor = mydb.cursor(buffered=True)
 
 mainTable = "tta2"
-purePresConditions=["president","isRt = 0","deleted = 0", "favCount > 0","mediaType = \"none\""] #"cleanedText like \"% %\""
+purePresConditions=["president","isRt = 0","isReply = 0","deleted = 0", "favCount > 0","mediaType = \"none\"","cleanedText like \"% %\""]
 
 
 def flattenList(train):

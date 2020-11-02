@@ -314,6 +314,8 @@ class RegressionModel():
 			if toInclude:
 				sizeOfBigMatrix += 1;
 		bigMatrix = np.zeros((len(tweets),sizeOfBigMatrix));
+		print("bigMatrixDims: ",bigMatrix.shape)
+		exit()
 
 		years = 4;
 		times = [t[4] for t in tweets];

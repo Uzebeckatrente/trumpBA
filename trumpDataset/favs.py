@@ -1,4 +1,4 @@
-
+from matplotlib import ticker, patches
 
 from .basisFuncs import *
 from .part3funcs import getMostPopularWordsOverCountNMostPopularBigramsOverCount, computeMostCommonnGrams, \
@@ -419,12 +419,16 @@ def analyzeSentimentSkewsVader(tweets,loadFromStorage = True,ns = [1,2,3,4],minC
 	skewsMedian = [x/(np.max(skewsMedian)-np.min(skewsMedian)) for x in skewsMedian]
 	skewsMedian = [(x - np.min(skewsMedian))*2-1 for x in skewsMedian]
 	# plt.plot([i for i in range(len(skewsMean))],skewsMean,label="skews mean")
-	plt.scatter([i for i in range(len(skewsMedian))], skewsMedian,label="Popularity (Scaled)",c="#FF0000")
+	plt.scatter([i for i in range(len(skewsMedian))], skewsMedian,label="Expected Popularity (Scaled)",c="#FF0000")
+	plt.yticks([-0.5,0.5],["Less Popular/\nLess Positive","More Popular/\nMore Positive"],fontsize=15)
+	plt.xticks([])
+	plt.xlabel("N-grams sorted by Expected Favourite Count",fontsize=15)
+	# plt.ylabel("")
 	# plt.plot([i for i in range(len(vadersMean))], vadersMean, label="vaders mean")
-	plt.plot([i for i in range(len(vadersMedian))], vadersMedian, label="Sentiment (Vader)")
+	plt.scatter([i for i in range(len(vadersMedian))], vadersMedian, label="N-Gram Sentiment (Vader)")
 	pearsonMean = pearsonCorrelationCoefficient(skewsMean,vadersMean)
 	pearsonMedian = pearsonCorrelationCoefficient(skewsMedian, vadersMedian)
-	plt.title("Correlation of Sentimental Positivity with Word Popularity: " + str(round(pearsonMedian,2)))
+	plt.title("Expected Favourite Count and Sentimental Positivity are Slightly Negatively Correlated (" + str(round(pearsonMedian,2))+")",fontsize=20)
 	plt.legend()
 	plt.show()
 
@@ -450,8 +454,12 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 		tweetsHash = calculateAndStorenGramsWithFavsMinusMeanMedian(ns, tweets,retabulate=True,minCount=minCount);
 		nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(ns, tweetsHash)
 
-	nGramsWithFavsMinusMean.sort(key = lambda tup: tup[nGramStorageIndicesSkew["skew"]])
-	nGramsWithFavsMinusMedian.sort(key=lambda tup: tup[nGramStorageIndicesSkew["skew"]])
+
+
+	nGramsWithFavsMinusMean = [tup for tup in nGramsWithFavsMinusMean if tup[nGramStorageIndicesSkew["nGram"]] not in ["2a","daughter"]]
+	nGramsWithFavsMinusMedian = [tup for tup in nGramsWithFavsMinusMedian if tup[nGramStorageIndicesSkew["nGram"]] not in ["2a","daughter"]]
+	nGramsWithFavsMinusMean.sort(key = lambda tup: tup[nGramStorageIndicesSkew["skew"]],reverse=True)
+	nGramsWithFavsMinusMedian.sort(key=lambda tup: tup[nGramStorageIndicesSkew["skew"]],reverse=True)
 	# nGramsWithFavsMinusMean = nGramsWithFavsMinusMean[-20:]
 	# nGramsWithFavsMinusMedian = nGramsWithFavsMinusMedian[-20:]
 
@@ -466,8 +474,8 @@ def analyzeOverUnderMeanSkewOfKeywords(tweets = "purePres", loadFromStorage = Tr
 	medianXs = [tup[nGramStorageIndicesSkew["nGram"]].replace(" ", "\n") + "\n" + str(tup[nGramStorageIndicesSkew["count"]]) for tup in nGramsWithFavsMinusMedian[:numberInChart]]
 	meanYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMean[:numberInChart]]
 	medianYs = [tup[nGramStorageIndicesSkew["favs"]] for tup in nGramsWithFavsMinusMedian[:numberInChart]];
-	boxAndWhiskerForKeyWordsFavs(meanXs,meanYs , fvcMean, title="Keywords with Lowest Expected Favourite Count")
-	boxAndWhiskerForKeyWordsFavs(medianXs, medianYs, fvcMedian, title="Keywords with Lowest Median Favourite Count")
+	boxAndWhiskerForKeyWordsFavs(meanXs,meanYs , fvcMean, title="1,2-grams with Highest Expected Favourite Count",yLabel="Expected Favourite Count for Each n-gram")
+	boxAndWhiskerForKeyWordsFavs(medianXs, medianYs, fvcMedian, title="1,2-grams with Highest Median Favourite Count",yLabel="Expected Favourite Count for Each n-gram")
 
 def normalizeTweetsFavCountsFixedWindowStrategy(tweets,daysPerMonth, determinator = "mean"):
 
@@ -638,13 +646,22 @@ def favouriteOverTimeTrends():
 		# plt.title("fav counts grouped by "+str(bestDaysPerMonthCount)+" days; pearson correlation coefficient: "+str(pearson))
 		# plt.legend()
 		# plt.show()
+	lastYear = 2012
+	firstIndicesOfYear = []
+	ticksIndiciesOfYear = []
+	for index, month in enumerate(months):
+		if month.year >= lastYear:
+			firstIndicesOfYear.append(index)
+			ticksIndiciesOfYear.append(str(lastYear));
+			lastYear += 1;
+
 
 	for index, month in enumerate(months):
 		if month > datetime.datetime(day=20,month=2,year=2017):
 			presidentDate = index;
 			break;
 	for index, month in enumerate(months):
-		if month > datetime.datetime(day=8,month=1,year=2016):
+		if month > datetime.datetime(day=8,month=11,year=2016):
 			electionDate = index;
 			break;
 	# plt.yscale("log")
@@ -657,22 +674,29 @@ def favouriteOverTimeTrends():
 	newMonths[0] = str(newMonths[0])[:10]
 	newDates = months.copy()
 
-	while len(newDates) - newDates.count("") > 15:
-		newDates = [str(date-datetime.timedelta(days=1))[:10] if index % showEveryNthDate == showEveryNthDate - 1 else "" for index, date in enumerate(newMonths[1:])];
-		showEveryNthDate += 1;
-		print("n00b")
-	newMonths[1:] = newDates
-	plt.xticks([i for i in range(len(newMonths))], newMonths);
-	firstPublishTime = tweets[0][1]
+	# while len(newDates) - newDates.count("") > 15:
+	# 	newDates = [str(date-datetime.timedelta(days=1))[:10] if index % showEveryNthDate == showEveryNthDate - 1 else "" for index, date in enumerate(newMonths[1:])];
+	# 	showEveryNthDate += 1;
+	# 	print("n00b")
+	# newMonths[1:] = newDates
+	#
+	# # startingDate = datetime.datetime()
+	# newMonths = [str(date-datetime.timedelta(days=1))[:4] if index % showEveryNthDate == showEveryNthDate - 1 else "" for index, date in enumerate(newMonths)];
+	# plt.xticks([])
+
+	plt.xticks(firstIndicesOfYear,ticksIndiciesOfYear,fontsize=15);
+	firstPublZishTime = tweets[0][1]
 
 
 	fitLineCoefficients = np.polyfit([i for i in range(len(months))], avgFavCounts, 1, full=False)
 	slope = fitLineCoefficients[0];
 	intercept = fitLineCoefficients[1]
-	plt.plot([i for i in range(len(months))],avgFavCounts,label="favCounts")
-	plt.plot([i for i in range(len(months))],[slope*i+intercept for i in range(len(months))],label="ols")
-	plt.title("fav counts grouped by "+str(bestDaysPerMonthCount)+" days; pearson correlation coefficient: "+str(round(bestPearson,2)))
-	plt.legend()
+	plt.ylabel("Average Favourite Counts over " + str(bestDaysPerMonthCount) + "-day Spans",fontsize=15)
+	plt.yticks(fontsize=12)
+	plt.plot([i for i in range(len(months))],avgFavCounts,label="Favourite Counts")
+	# plt.plot([i for i in range(len(months))],[slope*i+intercept for i in range(len(months))],label="ols")
+	plt.title("Favourite Counts Spike After 2016 Presidential Election",fontsize = 25)
+	plt.legend(fontsize=15)
 	plt.show()
 
 def graphPearsonsForApprFavOffset():
@@ -705,10 +729,28 @@ def graphPearsonsForApprFavOffset():
 	plt.title("correlation coefficients for approval rating and favCount, offset by variable number of days")
 	plt.show()
 
+def justGreat():
+	favs = [t[0] for t in getTweetsFromDB(orderBy="favCount asc",returnParams=["favCount"],purePres=False,conditions=["deleted = 0","isRt = 0","cleanedText = \"great\"","publishTime > \"2017-02-20 00:00:00\""])]
+	print(favs)
+
+	fig=plt.figure(num=None, figsize=(12, 2), dpi=80, facecolor='w', edgecolor='k')
+	fig.subplots_adjust(bottom=0.28,top=0.72)
+	ax = plt.subplot(1, 1, 1)
+	ax.set_title("Distribution of Favourite Counts for Tweets Whose Only Token is \"Great\"",fontsize=25)
+	ax.scatter(favs,[0 for _ in range(len(favs))],s=70,c="green",marker="x");
+	ax.set_ylim(-0.1, 0.1)
+	ax.set_yticks([0])
+	ax.set_yticklabels([""],fontsize=20)
+	ax.set_xticks([25000,50000,75000,100000])
+	ax.set_xticklabels(["25000","50000","75000","100000"],fontsize=20)
+	# ax.set_xlabel("Favourite Counts",fontsize=15)
+
+	plt.show()
+
 def graphFavCount(tweets = None, title=""):
 
-	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
-	fig.subplots_adjust(left=0.06, right=0.94)
+	# fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+	# fig.subplots_adjust(left=0.06, right=0.94)
 	if tweets == None:
 		tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
 	favCounts = [t[0] for t in tweets];
@@ -716,14 +758,34 @@ def graphFavCount(tweets = None, title=""):
 	# for i in [50000,100000,150000,200000]:
 	# 	plt.plot([0,len(tweets)],[i,i]);
 	# plt.plot([int(len(tweets)*0.75),int(len(tweets)*0.75)],[0,max(favCounts)]);
-	plt.boxplot(favCounts);
-	print(favCounts[int(len(favCounts)/8)],favCounts[-int(len(favCounts)/8)])
-	pearson = pearsonCorrelationCoefficient(favCounts, [i for i in range(len(favCounts))]);
-	plt.title("FavCount for all presidential tweets; Correlation Coefficient : "+str(pearson)+"; " + title);
+	# plt.boxplot(favCounts);
+	# print(favCounts[int(len(favCounts)/8)],favCounts[-int(len(favCounts)/8)])
+	# pearson = pearsonCorrelationCoefficient(favCounts, [i for i in range(len(favCounts))]);
+	# plt.title("FavCount for all presidential tweets; Correlation Coefficient : "+str(pearson)+"; " + title);
+	#
+	# plt.show();
+
+	plt.title("Favourite Counts for All of Trump's purePres Tweets");
+	print(len(tweets))
+	plt.plot(favCounts);
+	plt.xticks([1,7155],["1","7155"])
+	# plt.yticks(fontsize=12)
+	plt.ylabel("Favourite Counts")
+	plt.xlabel("Tweets Sorted by Fav. Count")
+	plt.gca().xaxis.grid(False)
+	# plt.gca().axis.grid(False)
+	anteil = 0.9
+	acceptableRect = patches.Rectangle((int(len(favCounts)*anteil), 0), int(len(favCounts)*(1-anteil)), max(favCounts), linewidth=0.5, alpha=0.32, color="#aabbcc")
 
 
+	# plt.annotate('Viral Tail', xy=(int(len(favCounts)*anteil)-270, int(max(favCounts)*0.8)), xycoords='data',
+	# 			xytext=(0.8, 0.95), textcoords='axes fraction',
+	# 			arrowprops=dict(facecolor='black', shrink=0.05),
+	# 			horizontalalignment='right', verticalalignment='top',
+	# 			)
+	plt.gca().add_patch(acceptableRect)
+	plt.show()
 
-	plt.show();
 
 def graphFavCountAndDerivative():
 	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");

@@ -118,13 +118,14 @@ def graphPopularityByWeekday(tweets, years = 4):
 	# 	axProd.plot([i for i in range(len(numTweetsByDay[i]))], mediansByDay[i]/numTweetsByDay[i], label=days[i], markerfacecolor='#' + str(i * 1000))
 
 	# for ax in axes:
-	axPop.set_xticks([])
 
 	axPop.set_xticks([i for i in range(len(days))])
 	axPop.set_xticklabels(days)
 	# axPop.set_xlabel("Days of the Week")
-	axPop.set_ylabel('Median Favourite Count')
-	axPop.set_title("Popularity of Tweets On Different Days of the Week")
+	axPop.set_ylabel('Median Favourite Count',fontsize=20)
+	axPop.set_title("Popularity of Tweets On Different Days of the Week",fontsize=25)
+	axPop.tick_params(axis='both', which='major', labelsize=18)
+
 	# axProd.set_title("Popularity of Tweets On Different Days of the Week")
 	# axPop.set_title("Number of Tweets on Different Days of the Week")
 
@@ -132,7 +133,7 @@ def graphPopularityByWeekday(tweets, years = 4):
 	# plt.xlabel("Days of the Week")
 	# plt.ylabel('Median Favourite Count')
 	if years > 1:
-		axPop.legend(custom_lines, ["Year " + str(i + 1) for i in range(len(custom_lines))], loc="upper left");
+		axPop.legend(custom_lines, ["Year " + str(i + 1) for i in range(len(custom_lines))], loc="upper left",fontsize=20);
 	plt.tight_layout()
 	plt.show();
 
@@ -142,14 +143,14 @@ def toTwoDigitsStr(n):
 		return ("0"+str(n))
 	return str(n)
 
-def graphPopularityByDayTime(tweets, years=5,numSegments = 8):
+def graphPopularityByDayTime(tweets, years=4,numSegments = 8):
 	tweets.sort(key=lambda t: t[4]);
 	tweets = list(map(lambda t: t[:4]+(t[4] + datetime.timedelta(hours=-5),),tweets))
 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
 	fig.subplots_adjust(left=0.06, right=0.94)
 
 	segSize = 24 / numSegments;
-	segments = [str(int(segSize * i))+":"+toTwoDigitsStr(int(segSize*i*100*(6/10))%60)+" til " + str(int(segSize * (i+1)))+":"+toTwoDigitsStr(int(segSize*(i+1)*100*(6/10))%60)+" til " for i in range(numSegments)];
+	segments = [str(int(segSize * i))+":"+toTwoDigitsStr(int(segSize*i*100*(6/10))%60)+"-" + str(int(segSize * (i+1)))+":"+toTwoDigitsStr(int(segSize*(i+1)*100*(6/10))%60)for i in range(numSegments)];
 	print(segments);
 
 
@@ -216,37 +217,38 @@ def graphPopularityByDayTime(tweets, years=5,numSegments = 8):
 	# 	custom_line = Line2D([0], [0], color=myColor, lw=4)
 	# 	custom_lines.append(custom_line)
 
-	plt.xticks([i for i in range(len(segments))],segments)
-	plt.xlabel("Times of Tweet Sending (Eastern Time)")
-	plt.ylabel('Median Favourite Count')
+	plt.xticks([i for i in range(len(segments))],segments,fontsize=22)
+	plt.yticks(fontsize=22)
+	plt.xlabel("\n(Eastern Time)",fontsize=25)
+	plt.ylabel('Median Favourite Count',fontsize=25)
 	if years > 1:
-		plt.legend(custom_lines, ["Year " + str(i+1) for i in range(len(custom_lines))],loc="lower right");
-	plt.title("Favourite Counts by Time of Day")
+		plt.legend(custom_lines, ["Year " + str(i+1) for i in range(len(custom_lines))],loc="lower right",fontsize=20);
+	plt.title("Favourite Counts Vary with Time of Day",fontsize=30)
 	plt.show();
 	###transpose the x values
 
 
 def graphPopularityByTweetsPerDay(tweets, numYears = 4):
-	tweets.sort(key=lambda tup: tup[-1])
-	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-	fig.subplots_adjust(left=0.06, right=0.94)
+	tweets.sort(key=lambda tup: tup[4])
+	# fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+	# fig.subplots_adjust(left=0.06, right=0.94)
 	favsPerDayCount = {}
 	
-	startingDate = tweets[0][-1]
-	totalTime = tweets[-1][-1] - tweets[0][-1];
+	startingDate = tweets[0][4]
+	totalTime = tweets[-1][4] - tweets[0][4];
 	if numYears == 4:
 		timePerYear = datetime.timedelta(days=365)
 	else:
 		timePerYear = totalTime / numYears;
 	endingDate = startingDate + timePerYear
 	for year in range(numYears):
-		theseTweets = [t for t in tweets if startingDate <= t[-1] <= endingDate]
-		startingTime = theseTweets[0][-1]
+		theseTweets = [t for t in tweets if startingDate <= t[4] <= endingDate]
+		startingTime = theseTweets[0][4]
 		currentTime = startingTime;
-		totalDays = (theseTweets[-1][-1]-startingTime).days
+		totalDays = (theseTweets[-1][4]-startingTime).days
 		index = 0;
 		while currentTime < datetime.datetime.now():
-			tweetsForDay = [t for t in theseTweets if currentTime <= t[-1] <= currentTime + datetime.timedelta(days=1)];
+			tweetsForDay = [t for t in theseTweets if currentTime <= t[4] <= currentTime + datetime.timedelta(days=1)];
 			if len(tweetsForDay) == 0:
 				mean = 0;
 			else:
@@ -277,7 +279,7 @@ def graphPopularityByTweetsPerDay(tweets, numYears = 4):
 		myColor = randomHexColor()
 		plt.scatter([i for i in range(len(favsPerDayCountList))],favsPerDayCountList,c=myColor,s=lenFavsPerDayList);
 		plt.plot([i for i in range(len(favsPerDayCountList))], favsPerDayCountList, c=myColor,linewidth=0.5);
-		plt.title("Popularity of Tweets Grouped by Tweets per Day")
+		plt.title("As Tweets per Day Increases, Popularity per Tweet Decreases",fontsize=22)
 		popularityForDay1Index = 1
 		popularityForDay15Index = 0;
 		for i in range(1,len(favsPerDayCountList)):
@@ -290,16 +292,18 @@ def graphPopularityByTweetsPerDay(tweets, numYears = 4):
 
 		pearson = pearsonCorrelationCoefficient([x*m+c for x in range(popularityForDay1Index,popularityForDay15Index)], favsPerDayCountList[popularityForDay1Index:popularityForDay15Index])
 		if numYears != 4:
-			plt.plot([1,15],[1*m+c,15*m+c],c=myColor,linewidth=2.5,label="Epoch " + str(year) +"; Regression Correlation Coefficient "+str(round(pearson,2))+" (Pearson)")
+			plt.plot([1,15],[1*m+c,15*m+c],c=myColor,linewidth=2.5,label="Epoch " + str(year) + " of Presidency")
 		else:
-			plt.plot([1, 15], [1 * m + c, 15 * m + c], c=myColor, linewidth=2.5, label="Year " + str(year+1) + " of Presidency; Regression Correlation Coefficient " + str(round(pearson, 2)) + " (Pearson)")
-
+			plt.plot([1, 15], [1 * m + c, 15 * m + c], c=myColor, linewidth=2.5, label="Year " + str(year+1) + " of Presidency")
 
 		startingDate = endingDate;
 		endingDate += timePerYear;
-	plt.legend()
-	plt.xlabel('Number of Tweets per Day')
-	plt.ylabel('Median Favourite Count')
+	# plt.legend(fontsize=18)
+	plt.xlabel('Number of Tweets per Day',fontsize=18)
+	plt.xticks(fontsize=18)
+	plt.ylabel('Median Favourite Count',fontsize=18)
+	plt.yticks(fontsize=18)
+
 	plt.ylim(60000,120000)
 	plt.show();
 
@@ -455,22 +459,29 @@ def graphPopularityOfTweetsInSpurts():
 
 	# diffs.sort();
 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-	fig.suptitle("Attenuating Popularity of Tweets in 2-chains", fontsize=20)
+	fig.suptitle("Attenuating Popularity of Tweets in 2-chains", fontsize=25)
+
 
 	axdiff = plt.subplot(2,1,1)
 	axpdiff = plt.subplot(2, 1, 2)
-	axdiff.scatter([i for i in range(len(diffs))], diffs,label="Tweet 2 - Tweet 1");
-	axdiff.plot([0,len(diffs)],[0,0])
-	axpdiff.scatter([i for i in range(len(percentDiffs))], percentDiffs);
-	axpdiff.plot([0, len(percentDiffs)], [0, 0],label="no difference")
-	axdiff.plot([0,len(percentDiffs)], [np.mean(diffs), np.mean(diffs)], label="mean ("+str(round(np.mean(diffs),2))+")");
+	axdiff.scatter([i for i in range(len(diffs))], diffs,label=r"$Tweet_2 - Tweet_1$");
+	axpdiff.scatter([i for i in range(len(percentDiffs))], percentDiffs,label = r'$\frac{Tweet_2-Tweet_1}{2(Tweet_2+Tweet_1)}$');
+	axdiff.plot([0,len(percentDiffs)], [np.mean(diffs), np.mean(diffs)],c="#ff00cc",label="mean ("+str(int(np.mean(diffs)))+")");
+	axpdiff.plot([0,len(percentDiffs)],[np.mean(percentDiffs),np.mean(percentDiffs)],c="#ff00cc",label="mean ("+str(round(np.mean(percentDiffs),2))+")")
 
-	axpdiff.plot([0,len(percentDiffs)],[np.mean(percentDiffs),np.mean(percentDiffs)],label="mean ("+str(round(np.mean(percentDiffs),2))+")")
-	axdiff.legend(loc="middle right")
-	axpdiff.legend(loc="middle right")
+	axdiff.legend(loc="center right")
+	axpdiff.legend(loc="center right")
 	print("positive diffs: ",len([diff for diff in percentDiffs if diff <= 0])/len(percentDiffs))
-	axdiff.set_title("Net Popularity Difference")
-	axpdiff.set_title("Percentage Popularity Difference")
+	axdiff.set_title("Net Popularity Difference",fontsize=18)
+	axpdiff.set_title("Percentage Popularity Difference",fontsize=18)
+
+	axdiff.set_xticks([]);
+	axdiff.set_xlabel("All Reply Tweets, Sorted by Net Popularity Difference",fontsize=13)
+	axdiff.set_ylabel("Difference in Popularity Between\nFirst and Second Tweet",fontsize=13)
+
+	axpdiff.set_xticks([]);
+	axpdiff.set_xlabel("All Reply Tweets, Sorted by Net Popularity Difference",fontsize=13)
+	axpdiff.set_ylabel("Percent Difference in Popularity\nBetween First and Second Tweet",fontsize=13)
 
 	plt.show();
 	plt.clf()
@@ -488,13 +499,13 @@ def graphPopularityOfTweetsInSpurts():
 	axdiff.scatter([i for i in range(len(diffsFirstThird))], diffsFirstThird,label="third - first",c=colors[0]);
 	axdiff.scatter([i for i in range(len(diffsSecondThird))], diffsSecondThird, label="third - second",c=colors[1]);
 	axdiff.scatter([i for i in range(len(diffsFirstSecond))], diffsFirstSecond, label="second - first",c=colors[2]);
-	axdiff.plot([0, len(diffsFirstThird)], [0, 0])
+	# axdiff.plot([0, len(diffsFirstThird)], [0, 0])
 
 	axpdiff.scatter([i for i in range(len(percentDiffsFirstThird))], percentDiffsFirstThird, label="third - first",c=colors[0]);
 	axpdiff.scatter([i for i in range(len(percentDiffsSecondThird))], percentDiffsSecondThird, label="third - second",c=colors[1]);
 	axpdiff.scatter([i for i in range(len(percentDiffsFirstSecond))], percentDiffsFirstSecond, label="second - first",c=colors[2]);
 
-	axpdiff.plot([0, len(percentDiffsFirstThird)], [0, 0], label="no difference")
+	# axpdiff.plot([0, len(percentDiffsFirstThird)], [0, 0], label="no difference")
 
 	axpdiff.plot([0, len(percentDiffsFirstThird)], [np.mean(percentDiffsFirstThird), np.mean(percentDiffsFirstThird)], label="mean (" + str(round(np.mean(percentDiffsFirstThird),2)) + ") third - first",c=colors[0])
 	axpdiff.plot([0, len(percentDiffsFirstThird)], [np.mean(percentDiffsSecondThird), np.mean(percentDiffsSecondThird)], label="mean (" + str(round(np.mean(percentDiffsSecondThird),2)) + ") third - second",c=colors[1])

@@ -1,3 +1,4 @@
+from matplotlib import patches
 
 from .basisFuncs import *
 from .part3funcs import computeMostCommonnGrams,getnGramsWithOverMOccurences;
@@ -91,9 +92,120 @@ def computenGramsWithBiggestSkewDifference(nGramsForAllEpochsRegularizedSkews):
 	return allNGramsInDifferenceOrder
 
 
+def relativeAbundanceNew(epochCount = 4, globalRegularization = False, minCount = 10, maxNumberOfNGrams = np.infty):
+
+	tweets = getTweetsFromDB(purePres=True, returnParams=["favCount","cleanedText, publishTime"],orderBy="publishTime asc")
+	firstPublishTime = tweets[0][2]
+	lastPublishTime = tweets[-1][2]
+	totalSeconds = (lastPublishTime - firstPublishTime).total_seconds()
+	epochTime = totalSeconds / epochCount;
+	print(epochTime);
+
+	print("total epoch time in days: ", epochTime / (3600 * 24))
+	ns = [1, 2, 3, 4]
+
+	# assign tweets to epochs
+	epochs = []
+	startingIndex = 0;
+	endingTime = firstPublishTime + datetime.timedelta(seconds=epochTime);
+	for index, tweet in enumerate(tweets):
+		if tweet[2] > endingTime:
+			epochs.append(tweets[startingIndex:index]);
+			startingIndex = index;
+			endingTime = endingTime + datetime.timedelta(seconds=epochTime)
+			if len(epochs) == epochCount - 1:
+				break;
+	epochs.append(tweets[startingIndex:])
+
+	nGramsAndCountsForEachEpoch = []
+	nGramsAndCountsForEachEpochRegularized = []
+	allNGrams = set()
 
 
-def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10, allGraphsInOnePlot = False):
+	for index, epochTweets in enumerate(epochs):
+		epochCleanTextAndFavs = [tweet[0:2] for tweet in epochTweets]
+		cleanTextsThisEpoch = [t[1] for t in epochCleanTextAndFavs];
+		tweetsHash = hashTweets(epochCleanTextAndFavs)
+		nGramsAndCountsForEpoch = []
+		for n in ns:
+			computeMostCommonnGrams(epochTweets, n);
+			myNGrams = getnGramsWithOverMOccurences(n, minCount, tweetsHash)
+
+			nGramsAndCountsForEpoch.extend(myNGrams);
+
+		maxOccurencesAcrossEpoch = max([tup[1] for tup in nGramsAndCountsForEpoch])
+		nGramsAndCountsForEpochRegularized = [(tup[0],tup[1]/maxOccurencesAcrossEpoch) for tup in nGramsAndCountsForEpoch];
+		nGramsAndCountsForEachEpoch.append(nGramsAndCountsForEpoch);
+		nGramsAndCountsForEachEpochRegularized.append(nGramsAndCountsForEpochRegularized);
+		allNGrams.update([tup[0] for tup in nGramsAndCountsForEpoch])
+	allNGrams = list(allNGrams)
+	allNGrams.sort()
+	for epoch in range(len(nGramsAndCountsForEachEpoch)):
+		nGramsForEpoch = [tup[0] for tup in nGramsAndCountsForEachEpoch[epoch]];
+		for nGram in allNGrams:
+			if nGram not in nGramsForEpoch:
+				nGramsAndCountsForEachEpoch[epoch].append((nGram,0));
+				nGramsAndCountsForEachEpochRegularized[epoch].append((nGram, 0));
+		nGramsAndCountsForEachEpoch[epoch].sort(key = lambda tup: tup[0])
+		nGramsAndCountsForEachEpochRegularized[epoch].sort(key=lambda tup: tup[0])
+
+	volatilityPerNgram = []
+	for nGramIndex in range(len(allNGrams)):
+		volatility = 0;
+		for epoch in range(epochCount-1):
+			volatility += np.fabs(nGramsAndCountsForEachEpochRegularized[epoch][nGramIndex][1]-nGramsAndCountsForEachEpochRegularized[epoch+1][nGramIndex][1])
+		print(allNGrams[nGramIndex])
+		if allNGrams[nGramIndex] == "great" or allNGrams[nGramIndex] == "coronavirus":
+			volatility = np.infty
+		volatilityPerNgram.append(volatility);
+	volatilityIDX = list(np.argsort(volatilityPerNgram))[::-1]
+	for epoch in range(epochCount):
+		nGramsAndCountsForEachEpochRegularized[epoch] = [nGramsAndCountsForEachEpochRegularized[epoch][i] for i in volatilityIDX][:maxNumberOfNGrams]
+		nGramsAndCountsForEachEpoch[epoch] = [nGramsAndCountsForEachEpoch[epoch][i] for i in volatilityIDX][:maxNumberOfNGrams]
+	allNGrams = [allNGrams[i] for i in volatilityIDX][:maxNumberOfNGrams]
+
+
+
+
+	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.21, top=0.92)
+	fig.tight_layout(pad=3.0)
+	axCount = fig.add_subplot(111);
+	iterColor = 11;
+
+
+	ind = np.arange(len(nGramsAndCountsForEachEpochRegularized[0]))
+	width = 1 / (epochCount + 1)
+	rects = []
+	np.random.seed(423)
+	for epoch, epochCounts in enumerate(nGramsAndCountsForEachEpochRegularized):
+		iterColorString = hex(iterColor)[2:]
+		c = randomHexColor()
+		rects1 = axCount.bar(ind + width * epoch, [tup[1] for tup in epochCounts], width, color=c)
+		rects.append(rects1)
+
+		iterColor += int(16777215 /epochCount)
+
+	for nGramIndex in range(len(allNGrams)):
+		acceptableRect = patches.Rectangle((nGramIndex-width*0.5, 0), width*epochCount, 1, linewidth=0.5, alpha=0.5, color=("#aabbcc" if nGramIndex % 2 == 0 else "#bbccaa"))
+		plt.gca().add_patch(acceptableRect)
+
+	axCount.set_title("Relative Frequency for each Year of Presidency for a Selection of n-grams",fontsize=25)
+	axCount.set_ylabel('Relative Frequency of n-gram Usage',fontsize=20)
+	# axCount.set_xlabel('Relative Frequency of n-gram Usage')
+	axCount.set_xticks(ind + width)
+	axCount.set_xticklabels(["\n"+ nGram.replace(" ","\n") for nGramIndex, nGram in enumerate(allNGrams[:maxNumberOfNGrams])]);
+	axCount.tick_params(axis='both', which='major', labelsize=20)
+	axCount.xaxis.grid(False)
+	for tick in axCount.xaxis.get_major_ticks():
+		# tick.label.set_fontsize(14)
+		# specify integer or one of preset strings, e.g.
+		# tick.label.set_fontsize('x-small')
+		tick.label.set_rotation('vertical')
+	axCount.legend((rects[i][0] for i in range(len(rects))), ("year " + str(i) for i in range(len(rects))),fontsize=20)
+	plt.show()
+
+def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10, maxNumberOfNGrams = np.infty, allGraphsInOnePlot = False):
 	# epochCount = 50;
 	tweets = getTweetsFromDB(purePres=True, returnParams=["favCount","cleanedText, publishTime"],orderBy="publishTime asc")
 	quickieGrams = ["coronavirus", "great", "fake news"]
@@ -300,7 +412,7 @@ def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10
 
 
 
-	if False:
+	if True:
 		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
 		fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top = 0.97)
 		fig.tight_layout(pad=3.0)
@@ -313,90 +425,77 @@ def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10
 			axSkew = fig.add_subplot(414)
 			axes = [axInEveryEpoch, axTopo, axSkew, axCount]
 		else:
-			axInEveryEpoch = fig.add_subplot(111);
-
-		iterColor = 11;
-		for nGram,topos in nGramTopoDict.items():
-			iterColorString = hex(iterColor)[2:]
-			c = "#"+(6-len(iterColorString))*'0'+iterColorString;
-			print(c)
-
-			axInEveryEpoch.plot(list(range(len(topos))),topos,color=c,label = nGram);
-			axInEveryEpoch.scatter(list(range(len(topos))), topos, color=c);
-			iterColor += int(16777215 / len(nGramTopoDict))
-
-		if not allGraphsInOnePlot:
-			axInEveryEpoch.set_title("topo for ngrams appearing in every epoch")
-			axInEveryEpoch.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axInEveryEpoch, nGramsForAllEpochsRegularized))  #
-			plt.show()
-			fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-			fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
-			fig.tight_layout(pad=3.0)
-			axTopo = fig.add_subplot(111);
-
-
-
-		iterColor = 11;
-		for nGram, topos in nGramTopoDictAll.items():
-			if not quickie or nGram in quickieGrams:
-
-				# c = randomHexColor()
-				iterColorString = hex(iterColor)[2:]
-				c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
-				print(c)
-
-
-				axTopo.plot(list(range(len(topos))), topos, color=c, label=nGram);
-				axTopo.scatter(list(range(len(topos))), topos, color=c);
-				iterColor += int(16777215 / len(nGramTopoDictAll))
-		if not allGraphsInOnePlot:
-			axTopo.set_title("topo for top " + str(topnFromEachEpoch) + " ngrams of each epoch")
-			axTopo.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axTopo, nGramsForAllEpochsRegularized))  #
-			plt.show()
-			# fig = plt.figure()
-			fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-			fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
-			fig.tight_layout(pad=3.0)
 			axCount = fig.add_subplot(111);
+			# axInEveryEpoch = fig.add_subplot(111);
+
+		# iterColor = 11;
+		# for nGram,topos in nGramTopoDict.items():
+		# 	iterColorString = hex(iterColor)[2:]
+		# 	c = "#"+(6-len(iterColorString))*'0'+iterColorString;
+		# 	print(c)
+		#
+		# 	axInEveryEpoch.plot(list(range(len(topos))),topos,color=c,label = nGram);
+		# 	axInEveryEpoch.scatter(list(range(len(topos))), topos, color=c);
+		# 	iterColor += int(16777215 / len(nGramTopoDict))
+		#
+		# if not allGraphsInOnePlot:
+		# 	axInEveryEpoch.set_title("topo for ngrams appearing in every epoch")
+		# 	axInEveryEpoch.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axInEveryEpoch, nGramsForAllEpochsRegularized))  #
+		# 	plt.show()
+		# 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# 	fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
+		# 	fig.tight_layout(pad=3.0)
+		# 	axTopo = fig.add_subplot(111);
+		#
+		#
+		#
+		# iterColor = 11;
+		# for nGram, topos in nGramTopoDictAll.items():
+		# 	if not quickie or nGram in quickieGrams:
+		#
+		# 		# c = randomHexColor()
+		# 		iterColorString = hex(iterColor)[2:]
+		# 		c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
+		# 		print(c)
+		#
+		#
+		# 		axTopo.plot(list(range(len(topos))), topos, color=c, label=nGram);
+		# 		axTopo.scatter(list(range(len(topos))), topos, color=c);
+		# 		iterColor += int(16777215 / len(nGramTopoDictAll))
+		# if not allGraphsInOnePlot:
+		# 	axTopo.set_title("topo for top " + str(topnFromEachEpoch) + " ngrams of each epoch")
+		# 	axTopo.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axTopo, nGramsForAllEpochsRegularized))  #
+		# 	plt.show()
+		# 	# fig = plt.figure()
+		# 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# 	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
+		# 	fig.tight_layout(pad=3.0)
+		# 	axCount = fig.add_subplot(111);
 
 		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
 		fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
 		fig.tight_layout(pad=3.0)
 		axCount = fig.add_subplot(111);
 		iterColor = 11;
-		for nGram, counts in nGramCountDictAll.items():
-			if not quickie or nGram in quickieGrams:
-
-				# c = randomHexColor()
-				iterColorString = hex(iterColor)[2:]
-				c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
-				print(c)
-
-				if not np.any(counts):
-					axCount.scatter(list(range(len(counts))), counts, color=c);
-					axCount.plot(list(range(len(counts))), counts, color=c);
-				else:
-					axCount.plot(list(range(len(counts))), counts, color=c,label=nGram);
-					axCount.scatter(list(range(len(counts))), counts, color=c);
-
-
-				iterColor += int(16777215 / len(nGramCountDictAll))
+		nGramCountDictItemsList = list(nGramCountDictAll.items())[:maxNumberOfNGrams];
+		nGramCountDictNGrams = [tup[0] for tup in nGramCountDictItemsList]
+		nGramCountDictCounts = [tup[1] for tup in nGramCountDictItemsList]
+		nGramCountDictCountsPerEpoch = []
+		for epoch in range(len(nGramCountDictCounts[0])):
+			nGramCountDictCountsThisEpoch = [nGramCounts[epoch] for nGramCounts in nGramCountDictCounts]
+			nGramCountDictCountsPerEpoch.append(nGramCountDictCountsThisEpoch)
+		ind = np.arange(len(nGramCountDictNGrams))
+		width = 1/(len(nGramCountDictCountsPerEpoch)+1)
+		rects = []
+		for epoch, epochCounts in enumerate(nGramCountDictCountsPerEpoch):
+			rects1 = axCount.bar(ind + width*epoch, epochCounts, width, color='r')
+			rects.append(rects1)
+			axCount.set_ylabel('Scores')
+		axCount.set_xticks(ind + width)
+		axCount.set_xticklabels(nGramCountDictNGrams)
+		axCount.legend((rects[i][0] for i in range(len(rects))), ("epoch " + str(i) for i in range(len(rects))))
 
 		if not allGraphsInOnePlot:
-			if epochCount != 4:
-				axCount.set_xticks(list(range(0,epochCount,3)))
-				axCount.set_xticklabels(["Month "+str(i+1) for i in range(0,epochCount,3)])
-				axCount.set_title("Relative Abundance for Top " + str(topnFromEachEpoch) + " n-grams of Each Month")
-			else:
-				axCount.set_xticks(list(range(0, epochCount)))
-				axCount.set_xticklabels(["Year " + str(i + 1) for i in range(0, epochCount)])
-				axCount.set_title("Relative Abundance for Top " + str(topnFromEachEpoch) + " n-grams of Each Year")
-			axCount.set_yticks([0.2, 0.8]);
-			axCount.set_yticklabels(["Least\nFrequent", "Most\nFrequent"])
-			axCount.legend(loc="upper right")#custom_lines, ['Cold', 'Medium', 'Hot'],
-			axCount.set_ylabel("Relative Abundance of Most Frequent n-grams")
-
-			axCount.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axCount, nGramsForAllEpochsRegularized))  #
 			plt.show()
 			fig = plt.figure()#num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
 			#fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
@@ -512,24 +611,35 @@ def tweetCountOverTime(daysPerMonth=7,globalRegularization = False):
 			epochs.append(tweets[startingIndex:index]);
 			startingIndex = index;
 			endingTime = endingTime + datetime.timedelta(seconds = epochTime)
-			dates.append(str(tweet[0])[:10])
+			dates.append(str(tweet[0])[:4])
 		if index == len(tweets)-1:
 			break;
 
 	# epochs.append(tweets[startingIndex:])
-	dates.append(str(tweets[-1][0])[:10])
+	dates.append(str(tweets[-1][0])[:4])
 
 	showEveryNthDate = 2;
 	newDates = dates.copy()
-	while len(newDates)-newDates.count("") > 4:
-		newDates = [date if index % showEveryNthDate == showEveryNthDate-1 else "" for index, date in enumerate(dates[1:])];
-		showEveryNthDate += 1;
-		print("n00b")
-	dates[1:] = newDates
+
+	dates = [date if index in [5+int(len(dates)/3.3 * x) for x in list(range(4))] else "" for index, date in enumerate(dates[1:])];
+	plt.gca().xaxis.grid(False)
+	print("dizzle: ",dates)
 	epochCount = len(epochs);
 
 	x = list(range(epochCount));
 	y = [len(epoch)/daysPerMonth for epoch in epochs];
+
+	# lastYear = 2012
+	# firstIndicesOfYear = []
+	# ticksIndiciesOfYear = []
+	# for index, month in enumerate(dates):
+	# 	if month.year >= lastYear:
+	# 		firstIndicesOfYear.append(index)
+	# 		ticksIndiciesOfYear.append(str(lastYear));
+	# 		lastYear += 1;
+
+
+
 	plt.xticks([i for i in range(len(dates)) if len(dates[i]) > 1],[date for date in dates if len(date)>1],fontsize=15);
 	plt.yticks(fontsize=15)
 	fitLineCoefficients = np.polyfit(x, y, 1, full=False)
