@@ -154,7 +154,6 @@ def relativeAbundanceNew(epochCount = 4, globalRegularization = False, minCount 
 		volatility = 0;
 		for epoch in range(epochCount-1):
 			volatility += np.fabs(nGramsAndCountsForEachEpochRegularized[epoch][nGramIndex][1]-nGramsAndCountsForEachEpochRegularized[epoch+1][nGramIndex][1])
-		print(allNGrams[nGramIndex])
 		if allNGrams[nGramIndex] == "great" or allNGrams[nGramIndex] == "coronavirus":
 			volatility = np.infty
 		volatilityPerNgram.append(volatility);
@@ -190,6 +189,8 @@ def relativeAbundanceNew(epochCount = 4, globalRegularization = False, minCount 
 		acceptableRect = patches.Rectangle((nGramIndex-width*0.5, 0), width*epochCount, 1, linewidth=0.5, alpha=0.5, color=("#aabbcc" if nGramIndex % 2 == 0 else "#bbccaa"))
 		plt.gca().add_patch(acceptableRect)
 
+
+
 	axCount.set_title("Relative Frequency for each Year of Presidency for a Selection of n-grams",fontsize=25)
 	axCount.set_ylabel('Relative Frequency of n-gram Usage',fontsize=20)
 	# axCount.set_xlabel('Relative Frequency of n-gram Usage')
@@ -203,6 +204,174 @@ def relativeAbundanceNew(epochCount = 4, globalRegularization = False, minCount 
 		# tick.label.set_fontsize('x-small')
 		tick.label.set_rotation('vertical')
 	axCount.legend((rects[i][0] for i in range(len(rects))), ("year " + str(i) for i in range(len(rects))),fontsize=20)
+	plt.show()
+
+
+
+
+def skewNew(epochCount = 4, globalRegularization = False, minCount = 10, maxNumberOfNGrams = np.infty):
+
+	tweets = getTweetsFromDB(purePres=True, returnParams=["favCount","cleanedText, publishTime"],orderBy="publishTime asc")
+	firstPublishTime = tweets[0][2]
+	lastPublishTime = tweets[-1][2]
+	totalSeconds = (lastPublishTime - firstPublishTime).total_seconds()
+	epochTime = totalSeconds / epochCount;
+	print(epochTime);
+
+	print("total epoch time in days: ", epochTime / (3600 * 24))
+	ns = [1, 2, 3, 4]
+
+	# assign tweets to epochs
+	epochs = []
+	startingIndex = 0;
+	endingTime = firstPublishTime + datetime.timedelta(seconds=epochTime);
+	for index, tweet in enumerate(tweets):
+		if tweet[2] > endingTime:
+			epochs.append(tweets[startingIndex:index]);
+			startingIndex = index;
+			endingTime = endingTime + datetime.timedelta(seconds=epochTime)
+			if len(epochs) == epochCount - 1:
+				break;
+	epochs.append(tweets[startingIndex:])
+
+	nGramsAndSkewsForEachEpoch = []
+	nGramsAndSkewsForEachEpochRegularized = []
+	allNGrams = set()
+
+
+	for index, epochTweets in enumerate(epochs):
+		epochCleanTextAndFavs = [tweet[0:2] for tweet in epochTweets]
+		epochMeanFavCount = np.mean([t[0] for t in epochTweets])
+		cleanTextsThisEpoch = [t[1] for t in epochCleanTextAndFavs];
+		tweetsHash = hashTweets(epochCleanTextAndFavs)
+		nGramsAndSkewsForEpoch = []
+
+		for n in ns:
+			computeMostCommonnGrams(epochTweets, n);
+			myNGrams = getnGramsWithOverMOccurences(n, minCount, tweetsHash)
+
+			for nGram in myNGrams:
+				tweetsWithThisNGramInThem = [t for t in epochTweets if nGram[0] in t[1]];
+				favsForTweetsWithNGramInThem = [t[0] for t in tweetsWithThisNGramInThem];
+				meanFavForTweetsWithNGramInThem = np.mean(favsForTweetsWithNGramInThem)
+				skew = meanFavForTweetsWithNGramInThem-epochMeanFavCount
+				nGramsAndSkewsForEpoch.append((nGram[0],skew));
+		skewsForEpoch = [tup[1] for tup in nGramsAndSkewsForEpoch];
+		minSkew = np.min(skewsForEpoch);
+		maxSkew = np.max(skewsForEpoch);
+		skewsForEpoch = [skew-minSkew for skew in skewsForEpoch];
+		skewsForEpoch = [skew/(maxSkew-minSkew) for skew in skewsForEpoch];
+		skewsForEpoch = [2*skew-1 for skew in skewsForEpoch];
+
+		nGramsAndSkewsForEpochRegularized = [(tup[0],(2*(tup[1]-minSkew)/(maxSkew-minSkew))-1) for tup in nGramsAndSkewsForEpoch];
+		nGramsAndSkewsForEpochRegularized.sort(key = lambda tup: tup[1]);
+		nGramsAndSkewsForEachEpoch.append(nGramsAndSkewsForEpoch);
+		nGramsAndSkewsForEachEpochRegularized.append(nGramsAndSkewsForEpochRegularized);
+		allNGrams.update([tup[0] for tup in nGramsAndSkewsForEpoch])
+		print("shwa",list(tup[0] for tup in nGramsAndSkewsForEpoch))
+		print("zigadumbe: ",nGramsAndSkewsForEpoch);
+	allNGrams = list(allNGrams)
+	allNGrams.sort()
+	for epoch in range(len(nGramsAndSkewsForEachEpoch)):
+		nGramsForEpoch = [tup[0] for tup in nGramsAndSkewsForEachEpoch[epoch]];
+		for nGram in allNGrams:
+			if nGram not in nGramsForEpoch:
+				nGramsAndSkewsForEachEpoch[epoch].append((nGram,0));
+				nGramsAndSkewsForEachEpochRegularized[epoch].append((nGram, 0));
+		nGramsAndSkewsForEachEpoch[epoch].sort(key = lambda tup: tup[0])
+		nGramsAndSkewsForEachEpochRegularized[epoch].sort(key=lambda tup: tup[0])
+
+	volatilityPerNgram = []
+	for nGramIndex in range(len(allNGrams)):
+		volatility = 0;
+		for epoch in range(epochCount-1):
+			if nGramsAndSkewsForEachEpochRegularized[epoch][nGramIndex][1] != 0:
+				volatility += np.fabs(nGramsAndSkewsForEachEpochRegularized[epoch][nGramIndex][1]-nGramsAndSkewsForEachEpochRegularized[epoch+1][nGramIndex][1])
+		print(allNGrams[nGramIndex]," has volatility: ",volatility)
+		if allNGrams[nGramIndex] == "invisible" and False:
+			volatility = np.infty
+		if "prime" in allNGrams[nGramIndex]:
+			volatility = 0;
+		volatilityPerNgram.append(volatility);
+	volatilityIDX = list(np.argsort(volatilityPerNgram))[::-1]
+	for epoch in range(epochCount):
+		nGramsAndSkewsForEachEpoch[epoch] = [nGramsAndSkewsForEachEpoch[epoch][i] for i in volatilityIDX][:maxNumberOfNGrams]
+		nGramsAndSkewsForEachEpochRegularized[epoch] = [nGramsAndSkewsForEachEpochRegularized[epoch][i] for i in volatilityIDX][:maxNumberOfNGrams]
+	allNGrams = [allNGrams[i] for i in volatilityIDX][:maxNumberOfNGrams]
+	print("allNGrams: ",allNGrams)
+
+
+	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.21, top=0.92)
+	fig.tight_layout(pad=3.0)
+	axCount = fig.add_subplot(111);
+	iterColor = 11;
+
+
+	ind = np.arange(len(nGramsAndSkewsForEachEpochRegularized[0]))
+	width = 1 / (epochCount + 1)
+	rects = []
+	np.random.seed(423)
+	for epoch, epochSkews in enumerate(nGramsAndSkewsForEachEpochRegularized):
+		print("epochSkews: ",epochSkews)
+		iterColorString = hex(iterColor)[2:]
+		c = randomHexColor()
+		print("thingoes: ",[tup[1] for tup in epochSkews]);
+		rects1 = axCount.bar(ind + width * epoch, [tup[1] for tup in epochSkews], width, color=c)
+		rects.append(rects1)
+
+		iterColor += int(16777215 /epochCount)
+
+	for nGramIndex in range(len(allNGrams)):
+		acceptableRect = patches.Rectangle((nGramIndex-width*0.5, 0), width*epochCount, 1, linewidth=0.5, alpha=0.5, color=("#aabbcc" if nGramIndex % 2 == 0 else "#bbccaa"))
+		plt.gca().add_patch(acceptableRect)
+
+	axCount.set_title("Skew of Top N-Grams for each Year of Presidency",fontsize=25)
+	axCount.set_ylabel('Skew for each n-gram (Regularized)',fontsize=20)
+	# axCount.set_xlabel('Relative Frequency of n-gram Usage')
+	axCount.set_xticks(ind + width)
+	axCount.set_xticklabels(["\n"+ nGram.replace(" ","\n") for nGramIndex, nGram in enumerate(allNGrams[:maxNumberOfNGrams])]);
+	axCount.tick_params(axis='both', which='major', labelsize=20)
+	axCount.xaxis.grid(False)
+	for tick in axCount.xaxis.get_major_ticks():
+		# tick.label.set_fontsize(14)
+		# specify integer or one of preset strings, e.g.
+		# tick.label.set_fontsize('x-small')
+		tick.label.set_rotation('vertical')
+	axCount.legend((rects[i][0] for i in range(len(rects))), ("year " + str(i) for i in range(len(rects))),fontsize=20)
+	plt.show()
+
+
+	###old
+	iterColor = 11;
+	for nGramIndex in range(maxNumberOfNGrams):
+		nGram = allNGrams[nGramIndex];
+		skews = [];
+		for epochIndex in range(len(nGramsAndSkewsForEachEpochRegularized)):
+			skew = nGramsAndSkewsForEachEpochRegularized[epochIndex][nGramIndex];
+			skews.append(skew[1]);
+		# c = randomHexColor()
+		iterColorString = hex(iterColor)[2:]
+		c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
+		print(c)
+		print("skews: ",skews)
+
+
+
+		plt.plot(list(range(len(skews))), skews, color=c, label=nGram);
+		plt.scatter(list(range(len(skews))), skews, color=c);
+
+		iterColor += int(16777215 / maxNumberOfNGrams)
+
+
+	plt.gca().set_title("Skew for a Selection of Highly Skews n-grams of Each Year of Trump's Presidency")
+	plt.gca().set_xticks(list(range(0, epochCount)))
+	plt.gca().set_xticklabels(["Year " + str(i + 1) for i in range(0, epochCount)])
+	plt.gca().set_yticks([-0.8, 0, 0.8]);
+	plt.gca().set_yticklabels(["Least\nPopular", "Neutral", "Most\nPopular"])
+	plt.gca().legend(loc="lower middle")  # custom_lines, ['Cold', 'Medium', 'Hot'],
+	# axCount.set_ylabel("Relative Abundance of Most Frequent n-grams")
+
 	plt.show()
 
 def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10, maxNumberOfNGrams = np.infty, allGraphsInOnePlot = False):
@@ -428,85 +597,85 @@ def compareVocabOverTime(epochCount=5,globalRegularization = False,minCount = 10
 			axCount = fig.add_subplot(111);
 			# axInEveryEpoch = fig.add_subplot(111);
 
-		# iterColor = 11;
-		# for nGram,topos in nGramTopoDict.items():
-		# 	iterColorString = hex(iterColor)[2:]
-		# 	c = "#"+(6-len(iterColorString))*'0'+iterColorString;
-		# 	print(c)
+		# # iterColor = 11;
+		# # for nGram,topos in nGramTopoDict.items():
+		# # 	iterColorString = hex(iterColor)[2:]
+		# # 	c = "#"+(6-len(iterColorString))*'0'+iterColorString;
+		# # 	print(c)
+		# #
+		# # 	axInEveryEpoch.plot(list(range(len(topos))),topos,color=c,label = nGram);
+		# # 	axInEveryEpoch.scatter(list(range(len(topos))), topos, color=c);
+		# # 	iterColor += int(16777215 / len(nGramTopoDict))
+		# #
+		# # if not allGraphsInOnePlot:
+		# # 	axInEveryEpoch.set_title("topo for ngrams appearing in every epoch")
+		# # 	axInEveryEpoch.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axInEveryEpoch, nGramsForAllEpochsRegularized))  #
+		# # 	plt.show()
+		# # 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# # 	fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
+		# # 	fig.tight_layout(pad=3.0)
+		# # 	axTopo = fig.add_subplot(111);
+		# #
+		# #
+		# #
+		# # iterColor = 11;
+		# # for nGram, topos in nGramTopoDictAll.items():
+		# # 	if not quickie or nGram in quickieGrams:
+		# #
+		# # 		# c = randomHexColor()
+		# # 		iterColorString = hex(iterColor)[2:]
+		# # 		c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
+		# # 		print(c)
+		# #
+		# #
+		# # 		axTopo.plot(list(range(len(topos))), topos, color=c, label=nGram);
+		# # 		axTopo.scatter(list(range(len(topos))), topos, color=c);
+		# # 		iterColor += int(16777215 / len(nGramTopoDictAll))
+		# # if not allGraphsInOnePlot:
+		# # 	axTopo.set_title("topo for top " + str(topnFromEachEpoch) + " ngrams of each epoch")
+		# # 	axTopo.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axTopo, nGramsForAllEpochsRegularized))  #
+		# # 	plt.show()
+		# # 	# fig = plt.figure()
+		# # 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# # 	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
+		# # 	fig.tight_layout(pad=3.0)
+		# # 	axCount = fig.add_subplot(111);
 		#
-		# 	axInEveryEpoch.plot(list(range(len(topos))),topos,color=c,label = nGram);
-		# 	axInEveryEpoch.scatter(list(range(len(topos))), topos, color=c);
-		# 	iterColor += int(16777215 / len(nGramTopoDict))
+		# fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
+		# fig.tight_layout(pad=3.0)
+		# axCount = fig.add_subplot(111);
+		# iterColor = 11;
+		# nGramCountDictItemsList = list(nGramCountDictAll.items())[:maxNumberOfNGrams];
+		# nGramCountDictNGrams = [tup[0] for tup in nGramCountDictItemsList]
+		# nGramCountDictCounts = [tup[1] for tup in nGramCountDictItemsList]
+		# nGramCountDictCountsPerEpoch = []
+		# for epoch in range(len(nGramCountDictCounts[0])):
+		# 	nGramCountDictCountsThisEpoch = [nGramCounts[epoch] for nGramCounts in nGramCountDictCounts]
+		# 	nGramCountDictCountsPerEpoch.append(nGramCountDictCountsThisEpoch)
+		# ind = np.arange(len(nGramCountDictNGrams))
+		# width = 1/(len(nGramCountDictCountsPerEpoch)+1)
+		# rects = []
+		# for epoch, epochCounts in enumerate(nGramCountDictCountsPerEpoch):
+		# 	rects1 = axCount.bar(ind + width*epoch, epochCounts, width, color='r')
+		# 	rects.append(rects1)
+		# 	axCount.set_ylabel('Scores')
+		# axCount.set_xticks(ind + width)
+		# axCount.set_xticklabels(nGramCountDictNGrams)
+		# axCount.legend((rects[i][0] for i in range(len(rects))), ("epoch " + str(i) for i in range(len(rects))))
 		#
 		# if not allGraphsInOnePlot:
-		# 	axInEveryEpoch.set_title("topo for ngrams appearing in every epoch")
-		# 	axInEveryEpoch.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axInEveryEpoch, nGramsForAllEpochsRegularized))  #
 		# 	plt.show()
-		# 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-		# 	fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
-		# 	fig.tight_layout(pad=3.0)
-		# 	axTopo = fig.add_subplot(111);
-		#
-		#
-		#
-		# iterColor = 11;
-		# for nGram, topos in nGramTopoDictAll.items():
-		# 	if not quickie or nGram in quickieGrams:
-		#
-		# 		# c = randomHexColor()
-		# 		iterColorString = hex(iterColor)[2:]
-		# 		c = "#" + (6 - len(iterColorString)) * '0' + iterColorString;
-		# 		print(c)
-		#
-		#
-		# 		axTopo.plot(list(range(len(topos))), topos, color=c, label=nGram);
-		# 		axTopo.scatter(list(range(len(topos))), topos, color=c);
-		# 		iterColor += int(16777215 / len(nGramTopoDictAll))
-		# if not allGraphsInOnePlot:
-		# 	axTopo.set_title("topo for top " + str(topnFromEachEpoch) + " ngrams of each epoch")
-		# 	axTopo.figure.canvas.mpl_connect("motion_notify_event", lambda event: on_plot_hover(event, axTopo, nGramsForAllEpochsRegularized))  #
-		# 	plt.show()
-		# 	# fig = plt.figure()
-		# 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-		# 	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
-		# 	fig.tight_layout(pad=3.0)
-		# 	axCount = fig.add_subplot(111);
-
-		fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-		fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
-		fig.tight_layout(pad=3.0)
-		axCount = fig.add_subplot(111);
-		iterColor = 11;
-		nGramCountDictItemsList = list(nGramCountDictAll.items())[:maxNumberOfNGrams];
-		nGramCountDictNGrams = [tup[0] for tup in nGramCountDictItemsList]
-		nGramCountDictCounts = [tup[1] for tup in nGramCountDictItemsList]
-		nGramCountDictCountsPerEpoch = []
-		for epoch in range(len(nGramCountDictCounts[0])):
-			nGramCountDictCountsThisEpoch = [nGramCounts[epoch] for nGramCounts in nGramCountDictCounts]
-			nGramCountDictCountsPerEpoch.append(nGramCountDictCountsThisEpoch)
-		ind = np.arange(len(nGramCountDictNGrams))
-		width = 1/(len(nGramCountDictCountsPerEpoch)+1)
-		rects = []
-		for epoch, epochCounts in enumerate(nGramCountDictCountsPerEpoch):
-			rects1 = axCount.bar(ind + width*epoch, epochCounts, width, color='r')
-			rects.append(rects1)
-			axCount.set_ylabel('Scores')
-		axCount.set_xticks(ind + width)
-		axCount.set_xticklabels(nGramCountDictNGrams)
-		axCount.legend((rects[i][0] for i in range(len(rects))), ("epoch " + str(i) for i in range(len(rects))))
-
-		if not allGraphsInOnePlot:
-			plt.show()
-			fig = plt.figure()#num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
-			#fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
-			#fig.tight_layout(pad=3.0)
-			axSkew = fig.add_subplot(111);
+		# 	fig = plt.figure()#num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+		# 	#fig.subplots_adjust(left=0.06, right=0.94, bottom=0.02, top=0.97)
+		# 	#fig.tight_layout(pad=3.0)
+		# 	axSkew = fig.add_subplot(111);
 	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
 	fig.subplots_adjust(left=0.08, right=0.94, bottom=0.11, top=0.92)
 	fig.tight_layout(pad=3.0)
 	axSkew = fig.add_subplot(111);
 	iterColor = 11;
-	for nGram, skews in nGramSkewDictAll.items():
+	for nGram, skews in list(nGramSkewDictAll.items()):
 		if not quickie or nGram in quickieGrams:
 			# c = randomHexColor()
 			iterColorString = hex(iterColor)[2:]

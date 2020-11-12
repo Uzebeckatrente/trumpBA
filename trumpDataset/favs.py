@@ -765,25 +765,38 @@ def graphFavCount(tweets = None, title=""):
 	#
 	# plt.show();
 
-	plt.title("Favourite Counts for All of Trump's purePres Tweets");
+	plt.title("Favourite Counts for All of Trump's purePres Tweets",fontsize=25);
 	print(len(tweets))
-	plt.plot(favCounts);
-	plt.xticks([1,7155],["1","7155"])
+	plt.plot(favCounts,linewidth=2);
+	plt.xticks([1,7155],["1","7155"],fontsize=18)
+	plt.yticks(fontsize=20)
+
 	# plt.yticks(fontsize=12)
-	plt.ylabel("Favourite Counts")
-	plt.xlabel("Tweets Sorted by Fav. Count")
+	plt.ylabel("Favourite Counts",fontsize=20)
+	plt.xlabel("Tweets Sorted by Fav. Count",fontsize=20)
 	plt.gca().xaxis.grid(False)
 	# plt.gca().axis.grid(False)
 	anteil = 0.9
-	acceptableRect = patches.Rectangle((int(len(favCounts)*anteil), 0), int(len(favCounts)*(1-anteil)), max(favCounts), linewidth=0.5, alpha=0.32, color="#aabbcc")
+	antiAnteil = round(1-anteil,2)
+	viralRect = patches.Rectangle((int(len(favCounts)*anteil), 0), int(len(favCounts)*(antiAnteil)), max(favCounts), linewidth=0.5, alpha=0.32, color="#00dd55")
+	viralRectBlack = patches.Rectangle((int(len(favCounts) * anteil), favCounts[int(len(favCounts)*anteil)]), int(len(favCounts) * (antiAnteil)), max(favCounts)-favCounts[int(len(favCounts)*anteil)], linewidth=1, alpha=1, color="#000000",fill=False)
+	middlingRect = patches.Rectangle((int(len(favCounts) * (antiAnteil)), 0), int(len(favCounts) * (anteil)), max(favCounts), linewidth=0.5, alpha=0.32, color="#88bbb1")
+	middlingRectBlack = patches.Rectangle((int(len(favCounts) * antiAnteil), favCounts[int(len(favCounts) * antiAnteil)]), int(len(favCounts) * (anteil)) - int(len(favCounts) * (antiAnteil)), favCounts[int(len(favCounts) * anteil)] - favCounts[int(len(favCounts) * antiAnteil)], linewidth=1, alpha=1, color="#000000", fill=False)
+	dudsRect = patches.Rectangle((0, 0), int(len(favCounts) * (antiAnteil)), max(favCounts), linewidth=0.5, alpha=0.32, color="#ffbbbb")
+	dudsRectBlack = patches.Rectangle((int(len(favCounts) * 0), favCounts[0]), int(len(favCounts) * (antiAnteil)) - int(len(favCounts) * (0)), favCounts[int(len(favCounts) * antiAnteil)] - favCounts[int(len(favCounts) * 0)], linewidth=1, alpha=1, color="#000000", fill=False)
 
+	print("TOP: ["+str(favCounts[int(len(favCounts)*anteil)]) + "," + str(favCounts[-1]) + "]")
+	print("MID: [" + str(favCounts[int(len(favCounts) * antiAnteil)]) + "," + str(favCounts[int(len(favCounts) * anteil)]) + "]")
+	print("MID: [" +str(favCounts[int(len(favCounts) * 0)])  + "," + str(favCounts[int(len(favCounts) * antiAnteil)])  + "]")
 
-	# plt.annotate('Viral Tail', xy=(int(len(favCounts)*anteil)-270, int(max(favCounts)*0.8)), xycoords='data',
-	# 			xytext=(0.8, 0.95), textcoords='axes fraction',
-	# 			arrowprops=dict(facecolor='black', shrink=0.05),
-	# 			horizontalalignment='right', verticalalignment='top',
-	# 			)
-	plt.gca().add_patch(acceptableRect)
+	# viralText = plt.gca().text(int(len(favCounts)*anteil), max(favCounts)*0.8, "Top " + str(int((antiAnteil)*100)) + "%" + "\n",va='center',ha='center')
+
+	plt.gca().add_patch(viralRect)
+	plt.gca().add_patch(middlingRect)
+	plt.gca().add_patch(dudsRect)
+	plt.gca().add_patch(viralRectBlack)
+	plt.gca().add_patch(middlingRectBlack)
+	plt.gca().add_patch(dudsRectBlack)
 	plt.show()
 
 

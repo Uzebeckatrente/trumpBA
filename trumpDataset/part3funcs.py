@@ -261,7 +261,7 @@ def normalize_headline(doc):
 
 
 def normalize_document(doc):
-    # lower case and remove special characters\whitespaces
+	# lower case and remove special characters\whitespaces
 	doc = doc.lower()
 	doc = doc.strip()
 	doc = doc.replace('\n', ' ')

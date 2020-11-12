@@ -126,52 +126,68 @@ def computeXandYForPlotting(tweets, daysPerMonth):
 	monthsCorrespondingToFifteenIndices = [str(months[index])[:10] for index in fifteenIndices];
 	return avgFavCounts, avgRtCounts, months, fifteenIndices, monthsCorrespondingToFifteenIndices, tweetIndicesByMonth
 
-def historgramFavCounts(favCounts):
-
-	# favCounts.sort(reverse=False)
-	# maxFavCount = favCounts[-1]
-	# colors = ['b','r','black']
-	# for boxSize in range(1,10):
-	# 	fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
-	# 	fig.subplots_adjust(left=0.06, right=0.94)
-	# 	# boxSize *= 1000
-	# 	boxSize *= 0.1
-	# 	boxes = [boxSize*i for i in range(1,int(maxFavCount/(boxSize))+1)]
-	# 	printhistorgramFavCounts("boxy")
-	# 	N, bins, patches = plt.hist(favCounts,bins=boxes,)
-	# 	print("histy")
-	# 	for i in range(len(patches)):
-	# 		patches[i].set_facecolor(colors[i%3])
-	# 	print("patchy")
-	#
-	# 	plt.show()
-	from scipy.stats import kstest
+def histogramFavCountsPoisson(favCounts):
 	favCounts.sort(reverse=False)
-	favCounts = np.array([np.log(fvc) if fvc >0 else 0 for fvc in favCounts])
+	favCounts = np.array([int(fvc/1000)for fvc in favCounts])
 	maxFavCount = favCounts[-1]
 	colors = ['b', 'r', 'black']
-	for boxSize in range(1, 20):
-		boxSize *= 2
-		fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
-		fig.subplots_adjust(left=0.06, right=0.94)
-		print("boxy")
-		# boxSize = int(maxFavCount);
-		N, bins, patches = plt.hist(favCounts, bins = boxSize)
-		print("histy")
-		for i in range(len(patches)):
-			patches[i].set_facecolor(colors[i % 3])
-		print("patchy")
-		x = np.linspace(-15, 15, 9) + 10
 
-		print(favCounts)
-		plt.title("Logarithmized Favourite Counts; KS-Score " + str(kstest(favCounts-np.mean(favCounts),"norm")))
+	# fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+	# fig.subplots_adjust(left=0.06, right=0.94)
 
-		plt.show()
+	bins = list(range(min(favCounts),max(favCounts),2));
+
+	N, bins, patches = plt.hist(favCounts,bins=bins)
+	for i in range(len(patches)):
+		patches[i].set_facecolor(colors[i % 3])
+
+	mean = np.mean(favCounts);
+	variance = np.var(favCounts);
+	print("mean: ",mean, " variance: ",variance);
+	print(favCounts)
+	plt.title("Poisson-like Distribution of purePres Tweets Favourite Counts",fontsize=25)
+
+	plt.xticks([10]+[i*100 for i in range(1,6)],[str(i*100)+"k" for i in range(6)],fontsize=20)
+	plt.ylabel("Density",fontsize=20)
+	plt.yticks([i*50 for i in range(5)],[str(round(i*50/len(favCounts),3)) for i in range(5)],fontsize=20)
+	plt.xlabel("Favourite Counts",fontsize=20)
+	plt.xlim(0,500)
+	#
+	plt.show()
+
+def histogramFavCounts(favCounts):
+	favCounts.sort(reverse=False)
+	favCounts = np.array([int(round(np.log(fvc),2)*100) if fvc >0 else 0 for fvc in favCounts])
+	maxFavCount = favCounts[-1]
+	colors = ['b', 'r', 'black']
+
+	# fig = plt.figure(num=None, figsize=(20, 10), dpi=80, facecolor='w', edgecolor='k')
+	# fig.subplots_adjust(left=0.06, right=0.94)
+
+	bins = list(range(min(favCounts),max(favCounts),2));
+
+	N, bins, patches = plt.hist(favCounts,bins=bins)
+	for i in range(len(patches)):
+		patches[i].set_facecolor(colors[i % 3])
+
+	mean = np.mean(favCounts);
+	variance = np.var(favCounts);
+	print("mean: ",mean, " variance: ",variance);
+	print(favCounts)
+	plt.title("Normal-like Distribution of Logarithmized purePres Tweets Favourite Counts\n",fontsize=25)
+	xes = [1010,1100,1180,1250,1320]
+	plt.xticks(xes,[str(int(np.exp(x/100)/1000))+"k" for x in xes],fontsize=20)
+	plt.ylabel("Density",fontsize=20)
+	plt.yticks([i*50 for i in range(5)],[str(round(i*50/len(favCounts),3)) for i in range(5)],fontsize=20)
+	plt.xlabel("Favourite Counts",fontsize=20)
+	plt.xlim(1000,1320)
+	#
+	plt.show()
 
 
 
 
-def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,title,yLabel = None):
+def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,title,yLabel = None, yMax = -1,medianprops = None):
 
 
 	data = favsForTweetsWithkeyword
@@ -187,11 +203,14 @@ def boxAndWhiskerForKeyWordsFavs(keywords, favsForTweetsWithkeyword, avgFav,titl
 
 	# Save the default tick positions, so we can reset them...
 
-	plt.plot(favX,[avgFav]*len(favX),linestyle='--',label="Average for whole Dataset")
-	plt.boxplot(data, positions=x, notch=False,showfliers=True)
+	plt.plot(favX,[avgFav]*len(favX),linestyle='--',label="Average for whole Dataset",linewidth=4)
+	plt.boxplot(data, positions=x, notch=False,showfliers=True,medianprops=medianprops);
+
 	plt.title(title,fontsize=20)
 	plt.legend(fontsize=15)
 	plt.yticks(fontsize=15)
+	if yMax != -1:
+		plt.ylim(0,yMax);
 	if yLabel != None:
 		plt.ylabel(yLabel,fontsize=15)
 

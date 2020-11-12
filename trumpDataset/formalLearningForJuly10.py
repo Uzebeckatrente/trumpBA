@@ -27,17 +27,17 @@ from keras import Sequential
 from keras.layers import Dense
 from scipy.stats import zscore
 
-def precisionAttenuatesWithBoxSize(classifiers,classifierNames, boxSizes, training, test):
+def precisionAttenuatesWithBoxSize(classifiers,classifierNames, boxSizes, training, test, title = "All Years Test Data"):
 	scores = []
 	for numBoxes in boxSizes:
 		for classifierIndex, classifier in enumerate(classifiers):
-			if classifierIndex == 0:
+			if classifierIndex == 0:#svm
 				classifier.train(training, percentageNGrams=0.3, includeWordEmbeddingMatrix=False, alpha=20, transformation="log", numBoxes=numBoxes)
-			elif classifierIndex == 1:
+			elif classifierIndex == 1:#mlp
 				classifier.train(training,percentageNGrams = 0.35, includeWordEmbeddingMatrix = False, alpha = 1,transformation="log", numIterationsMax = 200,numBoxes=numBoxes)
 			elif classifierIndex == 2:
 				classifier.train(training, percentageNGrams=0.35, includeWordEmbeddingMatrix=False, alpha=10, transformation="log", numBoxes=numBoxes)
-			score = classifier.test(test, title="All Years Test Data", crossVal=True, targetNames=["box " + str(i) for i in range(numBoxes)]);
+			score = classifier.test(test, title=title, crossVal=True, targetNames=["box " + str(i) for i in range(numBoxes)]);
 			try:
 				scores[classifierIndex].append(score)
 			except:
@@ -281,7 +281,7 @@ class RegressionModel():
 		np.save("trumpBA/trumpDataset/npStores/embeddingMatrix/wordEmbeddingMatrix"+tweetsHash+".npy", wordEmbeddingMatrix)
 		return wordEmbeddingMatrix
 
-	def createDataAndTargetMatrices(self, tweets,training = True, randomness= False):
+	def createDataAndTargetMatrices(self, tweets,training = True, randomness= False, metric = "normal"):
 		'''
 		•n-grams (m-hot)
 		•all-caps percentage
@@ -314,8 +314,6 @@ class RegressionModel():
 			if toInclude:
 				sizeOfBigMatrix += 1;
 		bigMatrix = np.zeros((len(tweets),sizeOfBigMatrix));
-		print("bigMatrixDims: ",bigMatrix.shape)
-		exit()
 
 		years = 4;
 		times = [t[4] for t in tweets];
@@ -342,21 +340,21 @@ class RegressionModel():
 		# bigMatrix = np.zeros((len(tweets), len(self.allNGrams)+len(extraParameters)+(wordEmbeddingMatrix.shape[1] if self.wordEmbeddingMatrix else 0)));
 		#####\create data matrices
 
-
+		allNGramsForAllTweets = [extractNGramsFromCleanedText(tweet[1], self.ns) for tweet in tweets];
 		#####fill bigMatrix
 		offSet = len(self.nGramIndices);
 		for tweetIndex, tweet in enumerate(tweets):
-			nGramsForTweet = extractNGramsFromCleanedText(tweet[1], self.ns);
+			nGramsForTweet = allNGramsForAllTweets[tweetIndex]
 			allCapsForTweet = [t.strip() for t in tweet[5].lower().split(" ") if len(t.strip()) > 0];
 
 			#### fill m-hot vector
-			for nGram in nGramsForTweet:
+			for nGram in set(nGramsForTweet):
 				if nGram in self.nGramIndices:
 					nGramIndex = self.nGramIndices[nGram]
-					if nGram in allCapsForTweet:
-						bigMatrix[tweetIndex][nGramIndex] = 1+self.allCapsBoost;
+					if metric == "TFIDF":
+						bigMatrix[tweetIndex][nGramIndex] = (nGramsForTweet.count(nGram)) / len(nGramsForTweet) * (len(tweets) / len([t for t in allNGramsForAllTweets if nGram in t]))
 					else:
-						bigMatrix[tweetIndex][nGramIndex] = 1.#/self.allNGramsWithCountsDict[nGram];
+						bigMatrix[tweetIndex][nGramIndex] = nGramsForTweet.count(nGram)+int(nGram in allCapsForTweet)*self.allCapsBoost;
 
 
 			#### fill wordEmbeddings
@@ -544,7 +542,7 @@ class RegressionModel():
 		# trainingTweets = myNegs + thesePositives;
 		return trainingTweets;
 
-	def train(self, trainingTweets, extraParamDict="default", hiddenLayers = (3,), allCapsBoost=0.5, alpha=0.1, percentileNegativePositive=1, percentileSplits = (0.5,), includeWordEmbeddingMatrix=True, twoClassBarrierCount=-1, distancePercentileFromSplit = 0.4, percentageNGrams = 0.5, transformation = None, numBoxes = 5, numIterationsMax = 500, learningRate = 1,boxSize = 100000):
+	def train(self, trainingTweets, extraParamDict="default", hiddenLayers = (3,), allCapsBoost=0.5, alpha=0.1, percentileNegativePositive=1, percentileSplits = (0.5,), includeWordEmbeddingMatrix=True, twoClassBarrierCount=-1, distancePercentileFromSplit = 0.4, percentageNGrams = 0.5, transformation = None, numBoxes = 5, numIterationsMax = 500, learningRate = 1,boxSize = 100000,minNGramCount = 2):
 		'''
 
 		:param trainingTweets: tweets in format ["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords"]
@@ -633,7 +631,7 @@ class RegressionModel():
 		allNGramsWithSkewsDict = {}
 
 
-		calculateAndStorenGramsWithFavsMinusMeanMedian(self.ns,[tweet[0:2] for tweet in trainingTweets],minCount=2,retabulate=False)
+		calculateAndStorenGramsWithFavsMinusMeanMedian(self.ns,[tweet[0:2] for tweet in trainingTweets],minCount=minNGramCount,retabulate=False)
 		nGramsWithFavsMinusMean, nGramsWithFavsMinusMedian = loadnGramsWithFavsMinusMeanMedian(self.ns, hashTweets([tweet[0:2] for tweet in trainingTweets]))
 		nGramsWithFavsMinusMean.sort(key = lambda tup: tup[nGramStorageIndicesSkew["skew"]]);
 		nGramsWithFavsMinusMedian.sort(key=lambda tup: tup[nGramStorageIndicesSkew["skew"]]);
@@ -649,7 +647,7 @@ class RegressionModel():
 			# if self.learner == "poisson":
 			# 	myNGramsWithCounts = getnGramsWithOverMOccurences(n, 2, hashTweets([tweet[0:2] for tweet in trainingTweets]))
 			# else:# self.learner == "ols":
-			myNGramsWithCounts = getnGramsWithOverMOccurences(n, 2, hashTweets([tweet[0:2] for tweet in trainingTweets]))
+			myNGramsWithCounts = getnGramsWithOverMOccurences(n, minNGramCount, hashTweets([tweet[0:2] for tweet in trainingTweets]))
 			rejects = [m for m in myNGramsWithCounts if m[0] not in acceptableNGrams];
 			myNGramsWithCounts = [m for m in myNGramsWithCounts if m[0] in acceptableNGrams];
 			print("numRej: ",len(rejects)," numTaken: ",len(myNGramsWithCounts));

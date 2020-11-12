@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 # graphPopularityByTweetsPerDay();
 
 # graphFavCount();
-#
+
 # graphFavCountAndDerivative()
 # analyzeAllCapsPercentage()
 # analyzeShortTweetPercentage()
@@ -42,7 +42,7 @@ from sklearn.model_selection import train_test_split
 # graphFavCount();
 # graphFollowerCountByFavCount()
 # exit()
-# compareVocabOverTime(18)
+# compareVocabOverTime(epochCount=4,maxNumberOfNGrams=10,minCount=200)
 # visualizeFavCountDistributionForKeyword("great",True);
 # analyzeAllCapsPercentage();
 # analyzeOverUnderMeanSkewOfKeywords();
@@ -112,11 +112,15 @@ from sklearn.model_selection import train_test_split
 # exit();
 np.random.seed(69)
 
+
+# skewNew(4,minCount=10, maxNumberOfNGrams=10)
 # relativeAbundanceNew(4,minCount=10, maxNumberOfNGrams=20)
 
 allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords","tweetText"], orderBy= "publishTime asc")
 # analyzeSentimentSkewsVader(allPresTweetsFavCountAndCleanedText);
 # favs = [t[0] for t in allPresTweetsFavCountAndCleanedText];
+# histogramFavCounts(favs);
+# exit()
 # favs.sort()
 # plt.plot(favs);
 # for i in range(10):
@@ -124,7 +128,7 @@ allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=[
 # plt.show()
 # exit()
 # for numYears in [1,4]:
-# 	graphPopularityByWeekday([t[:5] for t in allPresTweetsFavCountAndCleanedText],years=numYears);
+# 	graphPopularityByWeekday([t[:5] for t in allPresTweetsFavCountAndCleanedText],years=numYears,paramColor = "#ff4452");
 # exit()
 
 
@@ -160,17 +164,32 @@ allPresTweetsFavCountAndCleanedTextByYear3 = splitTweetsByYear(allPresTweetsFavC
 
 lastYearTweets = allPresTweetsFavCountAndCleanedTextByYear5[-1]
 lastYearTweets.sort(key=lambda t: t[0]);
-# for i in [0.1,0.2,0.3]:
-# 	print(Fore.MAGENTA,"i: ",i,Fore.RESET)
-# 	bottomTenthAndTopTenth =lastYearTweets[:int(len(allPresTweetsFavCountAndCleanedText)*i)]+lastYearTweets[int(len(lastYearTweets)*(1-i)):]
-# 	mainTrumpLDA(bottomTenthAndTopTenth)
+allPresTweetsFavCountAndCleanedText.sort(key = lambda t: t[0]);
+meanFavCountAllTweets = np.mean([t[0] for t in allPresTweetsFavCountAndCleanedText])
+medianFavCountAllTweets = np.median([t[0] for t in allPresTweetsFavCountAndCleanedText])
+meanFavCountLastYear = np.mean([t[0] for t in lastYearTweets])
+medianFavCountLastYear = np.median([t[0] for t in lastYearTweets])
+lastYear = True
+doLDA = False;
+if doLDA:
+	for percentile in [0.1,0.2,0.3,0.4,0.5]:
+		print(Fore.MAGENTA,"i: ", percentile, Fore.RESET)
+		if lastYear:
+			bottomTenthAndTopTenth = lastYearTweets[:int(len(lastYearTweets) * percentile)] + lastYearTweets[int(len(lastYearTweets) * (1 - percentile)):]
+			medianFavCount = medianFavCountLastYear
+			meanFavCount = meanFavCountLastYear
+		else:
+			meanFavCount = meanFavCountAllTweets
+			medianFavCount = medianFavCountAllTweets
+			bottomTenthAndTopTenth = allPresTweetsFavCountAndCleanedText[:int(len(allPresTweetsFavCountAndCleanedText) * percentile)] + allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * (1 - percentile)):]
+		mainTrumpLDA(bottomTenthAndTopTenth, percentile=percentile, meanForDataset=meanFavCount, medianForDataset=medianFavCount)
 # exit();
 
 # graphPopularityOfTweetsInSpurts();
 # graphPopularityByTweetsPerDay(allPresTweetsFavCountAndCleanedText,numYears=1);
 # graphPopularityByWeekday(allPresTweetsFavCountAndCleanedText)
 np.random.seed(428)
-graphPopularityByWeekday(allPresTweetsFavCountAndCleanedText,years=4)
+# graphPopularityByWeekday(allPresTweetsFavCountAndCleanedText,years=4)
 #
 # exit();
 
@@ -255,14 +274,14 @@ olsClassifier = RegressionModel("olsClassifier")
 # olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10,transformation="log",numBoxes=5)
 # scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
 # exit()
-# precisionAttenuatesWithBoxSize([svmClassifier,mlpClassifier,olsClassifier],["SVM","MLP","RR"],[2,3,4,5,8,11,14,17,20,40],trainingLastYear,testLastYear)
-
-# precisionAttenuatesWithBoxWidth([poissonClassifier,mlPoissonClassifier],["poisson","MLPoisson"],[400000,200000,100000,75000,50000,20000,10000],trainingLastYear,testLastYear)
-mlPoissonClassifier.train(allPresTweetsFavCountAndCleanedText,percentageNGrams=0.5,includeWordEmbeddingMatrix=False,alpha=0.0001,transformation="poisson",boxSize=100000);
-mlPoissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
-
-poissonClassifier.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=0.001,transformation="poisson",boxSize=100000);
-scoreNew2 = poissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+# precisionAttenuatesWithBoxSize([svmClassifier,mlpClassifier],["SVM","MLP"],[2,3,4,5,8,11,14,17,20,40],trainingLastYear,testLastYear)
+#
+# # precisionAttenuatesWithBoxWidth([poissonClassifier,mlPoissonClassifier],["poisson","MLPoisson"],[400000,200000,100000,75000,50000,20000,10000],trainingLastYear,testLastYear)
+# mlPoissonClassifier.train(allPresTweetsFavCountAndCleanedText,percentageNGrams=0.5,includeWordEmbeddingMatrix=False,alpha=0.0001,transformation="poisson",boxSize=100000);
+# mlPoissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
+#
+# poissonClassifier.train(trainingLastYear,percentageNGrams=0.25,includeWordEmbeddingMatrix=True,alpha=0.001,transformation="poisson",boxSize=100000);
+# scoreNew2 = poissonClassifier.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
 
 # mlpClassifier.train(trainingLastYear, percentageNGrams=0.35, includeWordEmbeddingMatrix=False, alpha=1, transformation="log", numIterationsMax=210, numBoxes=5)
 #
@@ -295,9 +314,31 @@ EWIGEN
 # scoreNew2 = mlpClassifier.test(test, title="Test Data Set Final Year",crossVal=False,targetNames=("0-10","90-100"));
 # scoreNew2 = mlpClassifier.test(test, title="test wordEmbeddingMatrix=False",crossVal=False,targetNames=("0-10","90-100"));
 
-# svmClassifier.train(training3070,percentageNGrams=0.3,includeWordEmbeddingMatrix=False,alpha=20)
-# scoreNew = svmClassifier.test(test3070, title="All Years Test Data",crossVal=False);
-# scoreNew = svmClassifier.test(training3070, title="All Years Training Data",crossVal=False);
+lastYear = True
+scores = []
+for percentile in [0.1,0.2,0.3,0.4,0.5]:
+	print(Fore.MAGENTA,"i: ", percentile, Fore.RESET)
+	if lastYear:
+		bottomTenthAndTopTenth = lastYearTweets[:int(len(lastYearTweets) * percentile)] + lastYearTweets[int(len(lastYearTweets) * (1 - percentile)):]
+
+	else:
+		bottomTenthAndTopTenth = allPresTweetsFavCountAndCleanedText[:int(len(allPresTweetsFavCountAndCleanedText) * percentile)] + allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * (1 - percentile)):]
+
+	trainingBottomAndTopTenth, testBottomAndTopTenth, _ = splitTrainingTest(bottomTenthAndTopTenth)
+	svmClassifier.train(trainingBottomAndTopTenth, percentageNGrams=0.5, includeWordEmbeddingMatrix=False, alpha=20)
+
+	scoreNew = svmClassifier.test(testBottomAndTopTenth, title="All Years Test Data", crossVal=True);
+	print("scoreNew: ", scoreNew);
+	# scoreNew = svmClassifier.test(trainingBottomAndTopTenth, title="All Years Training Data", crossVal=False);
+	scores.append(scoreNew);
+print("svm scores: ",scores);
+exit()
+
+# exit();
+
+svmClassifier.train(training3070,percentageNGrams=0.3,includeWordEmbeddingMatrix=False,alpha=20)
+scoreNew = svmClassifier.test(test3070, title="All Years Test Data",crossVal=False);
+scoreNew = svmClassifier.test(training3070, title="All Years Training Data",crossVal=False);
 
 # olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10)
 # scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
@@ -403,8 +444,8 @@ scores = {};
 
 if True:
 	scores["allNormalized"]= [];
-	for i in range(len(foldsNorm)):
-		trainFlat, holdOut = flattenFolds(foldsNorm, i)
+	for percentile in range(len(foldsNorm)):
+		trainFlat, holdOut = flattenFolds(foldsNorm, percentile)
 		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
 		# poissonClassifier.train(training,reload=False)
 		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
@@ -412,8 +453,8 @@ if True:
 		scores["allNormalized"].append(score);
 
 	scores["allRegular"]= [];
-	for i in range(len(foldsNorm)):
-		trainFlat, holdOut = flattenFolds(foldsNorm, i)
+	for percentile in range(len(foldsNorm)):
+		trainFlat, holdOut = flattenFolds(foldsNorm, percentile)
 		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
 		# poissonClassifier.train(training,reload=False)
 		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
@@ -437,10 +478,10 @@ print(scores);
 exit()
 
 scores["fifthWithEmbedding"]= [];
-for i in range(len(foldsLastYear)):
-	if i == 4:
-		print(i);
-	trainFlat, holdOut = flattenFolds(foldsLastYear, i)
+for percentile in range(len(foldsLastYear)):
+	if percentile == 4:
+		print(percentile);
+	trainFlat, holdOut = flattenFolds(foldsLastYear, percentile)
 	newPoissonClassifier.train(trainFlat,extraParamNum=0,wordEmbeddingMatrix=True)
 	# poissonClassifier.train(training,reload=False)
 	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
@@ -450,8 +491,8 @@ for i in range(len(foldsLastYear)):
 
 
 scores["fifthSansEmbedding"]= [];
-for i in range(len(foldsLastYear)):
-	trainFlat, holdOut = flattenFolds(foldsLastYear, i)
+for percentile in range(len(foldsLastYear)):
+	trainFlat, holdOut = flattenFolds(foldsLastYear, percentile)
 	newPoissonClassifier.train(trainFlat,extraParamNum=0,wordEmbeddingMatrix=False)
 	# poissonClassifier.train(training,reload=False)
 	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
@@ -577,9 +618,9 @@ if recomputeWordEmbeddingVectors:
 
 	for index,t in enumerate(presidentialTweets):
 		topNVectors = getTopNVectorsForTweet(wordEmbeddings, t, nForTopNWordEmbeddings, vectorLen)
-		for i in range(nForTopNWordEmbeddings):
+		for percentile in range(nForTopNWordEmbeddings):
 			try:
-				wordEmbeddingsMarix[:,index+i] = topNVectors[i]
+				wordEmbeddingsMarix[:, index + percentile] = topNVectors[percentile]
 			except:
 				continue;
 		if index%100 == 0:

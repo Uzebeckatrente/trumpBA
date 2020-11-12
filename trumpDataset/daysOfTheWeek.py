@@ -28,13 +28,13 @@ def determineSegmentOfDay(dt: datetime.datetime, numSegments = 12):
 
 
 
-def graphPopularityByWeekday(tweets, years = 4):
+def graphPopularityByWeekday(tweets, years = 4,paramColor = None):
 	tweets.sort(key = lambda t: t[-1]);
 	tweets = list(map(lambda t: t[:4] + (t[4] + datetime.timedelta(hours=-5),), tweets))
 
 	days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-	fig = plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
+	fig = plt.figure(num=None, figsize=(16, 5), dpi=80, facecolor='w', edgecolor='k')
 	fig.subplots_adjust(left=0.06, right=0.94)
 
 	axPop = plt.subplot(1, 1, 1)
@@ -80,8 +80,10 @@ def graphPopularityByWeekday(tweets, years = 4):
 		# favsSum = np.sum([len(favs) for favs in daysFavCounts]);
 		# sizesPop = [2000 * len(favs) / favsSum for favs in daysFavCounts]
 
-
-		myColor = randomHexColor()
+		if paramColor:
+			myColor = paramColor
+		else:
+			myColor = randomHexColor();
 
 		# 	axPop.plot([i for i in range(len(mediansByDay[i]))],mediansByDay[i],label=days[i], markerfacecolor='#'+str(i*1000));
 		# 	axNum.plot([i for i in range(len(numTweetsByDay[i]))],numTweetsByDay[i],label=days[i], markerfacecolor='#'+str(i*1000))
@@ -122,9 +124,9 @@ def graphPopularityByWeekday(tweets, years = 4):
 	axPop.set_xticks([i for i in range(len(days))])
 	axPop.set_xticklabels(days)
 	# axPop.set_xlabel("Days of the Week")
-	axPop.set_ylabel('Median Favourite Count',fontsize=20)
-	axPop.set_title("Popularity of Tweets On Different Days of the Week",fontsize=25)
-	axPop.tick_params(axis='both', which='major', labelsize=18)
+	axPop.set_ylabel('Median Favourite Count',fontsize=25)
+	axPop.set_title("Popularity of Tweets On Different Days of the Week",fontsize=30)
+	axPop.tick_params(axis='both', which='major', labelsize=25)
 
 	# axProd.set_title("Popularity of Tweets On Different Days of the Week")
 	# axPop.set_title("Number of Tweets on Different Days of the Week")
