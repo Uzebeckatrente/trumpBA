@@ -117,6 +117,14 @@ np.random.seed(69)
 # relativeAbundanceNew(4,minCount=10, maxNumberOfNGrams=20)
 
 allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=["isReply = 0"],returnParams=["favCount","cleanedText, allCapsRatio, mediaType, publishTime","allCapsWords","tweetText"], orderBy= "publishTime asc")
+
+
+
+# analyzeHashtagsAndAtTags(allPresTweetsFavCountAndCleanedText);
+#
+#
+# exit()
+
 # analyzeSentimentSkewsVader(allPresTweetsFavCountAndCleanedText);
 # favs = [t[0] for t in allPresTweetsFavCountAndCleanedText];
 # histogramFavCounts(favs);
@@ -314,31 +322,44 @@ EWIGEN
 # scoreNew2 = mlpClassifier.test(test, title="Test Data Set Final Year",crossVal=False,targetNames=("0-10","90-100"));
 # scoreNew2 = mlpClassifier.test(test, title="test wordEmbeddingMatrix=False",crossVal=False,targetNames=("0-10","90-100"));
 
-lastYear = True
-scores = []
-for percentile in [0.1,0.2,0.3,0.4,0.5]:
-	print(Fore.MAGENTA,"i: ", percentile, Fore.RESET)
-	if lastYear:
-		bottomTenthAndTopTenth = lastYearTweets[:int(len(lastYearTweets) * percentile)] + lastYearTweets[int(len(lastYearTweets) * (1 - percentile)):]
-
-	else:
-		bottomTenthAndTopTenth = allPresTweetsFavCountAndCleanedText[:int(len(allPresTweetsFavCountAndCleanedText) * percentile)] + allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * (1 - percentile)):]
-
-	trainingBottomAndTopTenth, testBottomAndTopTenth, _ = splitTrainingTest(bottomTenthAndTopTenth)
-	svmClassifier.train(trainingBottomAndTopTenth, percentageNGrams=0.5, includeWordEmbeddingMatrix=False, alpha=20)
-
-	scoreNew = svmClassifier.test(testBottomAndTopTenth, title="All Years Test Data", crossVal=True);
-	print("scoreNew: ", scoreNew);
-	# scoreNew = svmClassifier.test(trainingBottomAndTopTenth, title="All Years Training Data", crossVal=False);
-	scores.append(scoreNew);
-print("svm scores: ",scores);
-exit()
-
-# exit();
-
-svmClassifier.train(training3070,percentageNGrams=0.3,includeWordEmbeddingMatrix=False,alpha=20)
-scoreNew = svmClassifier.test(test3070, title="All Years Test Data",crossVal=False);
-scoreNew = svmClassifier.test(training3070, title="All Years Training Data",crossVal=False);
+# lastYear = False
+# scoresSVM = []
+# scoresMLP = []
+# for percentile in [0.1]:#,0.2,0.3,0.4,0.5]:
+# 	print(Fore.MAGENTA,"i: ", percentile, Fore.RESET)
+# 	if lastYear:
+# 		# bottomTenthAndTopTenth = lastYearTweets[:int(len(lastYearTweets) * percentile)] + lastYearTweets[int(len(lastYearTweets) * (1 - percentile)):]
+# 		bottomTenthAndTopTenth = lastYearTweets[int(len(lastYearTweets) * 0.0):int(len(lastYearTweets) * 0.1)] + lastYearTweets[int(len(lastYearTweets) * 0.5):int(len(lastYearTweets) * 0.6)]
+#
+# 	else:
+# 		# bottomTenthAndTopTenth = allPresTweetsFavCountAndCleanedText[:int(len(allPresTweetsFavCountAndCleanedText) * percentile)] + allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * (1 - percentile)):]
+# 		bottomTenthAndTopTenth = allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * 0.0):int(len(allPresTweetsFavCountAndCleanedText) * 0.1)] + allPresTweetsFavCountAndCleanedText[int(len(allPresTweetsFavCountAndCleanedText) * 0.5):int(len(allPresTweetsFavCountAndCleanedText) * 0.6)]
+#
+# 	trainingBottomAndTopTenth, testBottomAndTopTenth, _ = splitTrainingTest(bottomTenthAndTopTenth)
+# 	for alpha in [0.1,0.5,1,5,10,15,20,30,50]:
+# 		for percentageNGrams in [0.1,0.15,0.2,0.3,0.4,0.5]:
+# 			svmClassifier.train(trainingBottomAndTopTenth, percentageNGrams=percentageNGrams, includeWordEmbeddingMatrix=False, alpha=alpha)
+# 			#
+# 			scoreSVM = svmClassifier.test(testBottomAndTopTenth, title="All Years Test Data", crossVal=True);
+# 			mlpClassifier.train(trainingBottomAndTopTenth,percentageNGrams = percentageNGrams, includeWordEmbeddingMatrix = False, alpha = alpha, numIterationsMax = 200)
+# 			scoreMLP = mlpClassifier.test(testBottomAndTopTenth, title="All Years Training Data", crossVal=True);
+# 			# if scoreNew > 0.85:
+# 			# 	mlpClassifier.test(testBottomAndTopTenth, title="All Years Training Data", crossVal=False);
+# 			print("scoreNew: ", scoreSVM);
+#
+# 			scoresSVM.append((percentile, alpha, percentageNGrams, scoreSVM));
+# 			scoresMLP.append((percentile,alpha,percentageNGrams,scoreMLP));
+# scoresSVM.sort(key = lambda tup: tup[3], reverse=True)
+# scoresMLP.sort(key = lambda tup: tup[3],reverse=True)
+# print("mlp scores all years: ",scoresMLP);
+# print("svm scores all years: ", scoresSVM);
+# exit()
+#
+# # exit();
+#
+# svmClassifier.train(training3070,percentageNGrams=0.3,includeWordEmbeddingMatrix=False,alpha=20)
+# scoreSVM = svmClassifier.test(test3070, title="All Years Test Data", crossVal=False);
+# scoreSVM = svmClassifier.test(training3070, title="All Years Training Data", crossVal=False);
 
 # olsClassifier.train(trainingLastYear,percentageNGrams=0.35,includeWordEmbeddingMatrix=True,alpha=10)
 # scoreNew = olsClassifier.test(testLastYear, title="Ridge Regression On Final Year Test Data",crossVal=False);
@@ -368,7 +389,7 @@ scoreNew = svmClassifier.test(training3070, title="All Years Training Data",cros
 # scoreNew2 = newPoissonClassifier2.test(testLastYear, title="test wordEmbeddingMatrix=False",crossVal=False);
 # newPoissonClassifier2.test(trainingLastYear,title="training wordEmbeddingMatrix=False",crossVal=False);
 
-training
+# training
 fourModelComparisonRegression(training,test,allPresTweetsFavCountAndCleanedText)
 exit()
 '''
@@ -438,28 +459,28 @@ End EWIGEN
 # newPoissonClassifier.test(trainingLastYearNorm,title="training",crossVal=True);
 # scoreNew = newPoissonClassifier.test(testLastYearNorm, title="test",crossVal=True);
 
-scores = {};
+scoresSVM = {};
 
 # favouriteOverTimeTrends();
 
 if True:
-	scores["allNormalized"]= [];
+	scoresSVM["allNormalized"]= [];
 	for percentile in range(len(foldsNorm)):
 		trainFlat, holdOut = flattenFolds(foldsNorm, percentile)
 		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
 		# poissonClassifier.train(training,reload=False)
 		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
 		score=newPoissonClassifier2.test(holdOut,"test",crossVal=True);
-		scores["allNormalized"].append(score);
+		scoresSVM["allNormalized"].append(score);
 
-	scores["allRegular"]= [];
+	scoresSVM["allRegular"]= [];
 	for percentile in range(len(foldsNorm)):
 		trainFlat, holdOut = flattenFolds(foldsNorm, percentile)
 		newPoissonClassifier2.train(trainFlat,extraParamNum=0)
 		# poissonClassifier.train(training,reload=False)
 		newPoissonClassifier2.test(trainFlat,"training",crossVal=True);
 		score=newPoissonClassifier2.test(holdOut,"test",crossVal=True);
-		scores["allRegular"].append(score);
+		scoresSVM["allRegular"].append(score);
 	# 
 	# 
 	# scores["fifthNormalized"]= [];
@@ -471,13 +492,13 @@ if True:
 	# 	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
 	# 	scores["fifthNormalized"].append(score);
 
-for s in scores.keys():
-	scores[s] = np.mean(scores[s]);
-print(scores);
+for s in scoresSVM.keys():
+	scoresSVM[s] = np.mean(scoresSVM[s]);
+print(scoresSVM);
 
 exit()
 
-scores["fifthWithEmbedding"]= [];
+scoresSVM["fifthWithEmbedding"]= [];
 for percentile in range(len(foldsLastYear)):
 	if percentile == 4:
 		print(percentile);
@@ -486,18 +507,18 @@ for percentile in range(len(foldsLastYear)):
 	# poissonClassifier.train(training,reload=False)
 	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
 	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
-	scores["fifthWithEmbedding"].append(score);
+	scoresSVM["fifthWithEmbedding"].append(score);
 
 
 
-scores["fifthSansEmbedding"]= [];
+scoresSVM["fifthSansEmbedding"]= [];
 for percentile in range(len(foldsLastYear)):
 	trainFlat, holdOut = flattenFolds(foldsLastYear, percentile)
 	newPoissonClassifier.train(trainFlat,extraParamNum=0,wordEmbeddingMatrix=False)
 	# poissonClassifier.train(training,reload=False)
 	newPoissonClassifier.test(trainFlat,"training",crossVal=True);
 	score=newPoissonClassifier.test(holdOut,"test",crossVal=True);
-	scores["fifthSansEmbedding"].append(score);
+	scoresSVM["fifthSansEmbedding"].append(score);
 
 
 

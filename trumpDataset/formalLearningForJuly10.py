@@ -110,12 +110,16 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 	for dataSetIndex in range(len(dataSetNames)):
 		print("di: ",dataSetIndex)
 		predictions = predictionsEs[dataSetIndex]
+		correlationCoefficient = r2_score(targetMatrix, predictions);
+		numInRangeDS = 0;
+		print("index: ",dataSetIndex," coef: ",correlationCoefficient);
 		custom_lines.append(Line2D([0], [0], lw=4,linestyle="none",markersize=10, alpha=0.6,marker=markers[dataSetIndex], color='#000000'))
 		labels.append(dataSetNames[dataSetIndex])
 		for tweetIndex in range(len(testTweets)):
-			print("ti: ",tweetIndex);
+			# print("ti: ",tweetIndex);
 			target = targetMatrix[tweetIndex];
 			prediction = predictions[tweetIndex];
+
 			if acceptableRange <= 1:
 				acceptableMin = (target * (1 - acceptableRange))
 				acceptableMax = (target * (1 + acceptableRange))
@@ -125,6 +129,7 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 			inAcceptableRange = acceptableMin <= prediction <= acceptableMax
 
 			numInRange += int(inAcceptableRange)
+			numInRangeDS += int(inAcceptableRange)
 			if doGraph:
 				if inAcceptableRange:
 					plt.scatter([tweetIndex], [prediction], c='#00ff00', marker=markers[dataSetIndex],s=16)
@@ -133,7 +138,7 @@ def graphConfusionMatrixContinuousMultipleInputs(testTweets, predictionsEs, targ
 				if dataSetIndex == 0:
 					acceptableRect = patches.Rectangle((tweetIndex, acceptableMin), 1, acceptableMax - acceptableMin, linewidth=0.5, alpha=0.32, color="#aabbcc")
 					plt.gca().add_patch(acceptableRect)
-
+		print(dataSetIndex,"numInRange: ",numInRangeDS/len(predictions))
 	xes = [i for i in range(predictionsEs[0].size)];
 
 	# plt.scatter(xes, predictions, c='r', label='Predicted Counts')
@@ -874,11 +879,11 @@ class RegressionModel():
 				barLabels.append("Classifier Guessed "+str(shouldHaveBeenThisClass))
 				indexLabels.append("Target: "+str(shouldHaveBeenThisClass))
 			ax.bar(ind+width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex)*0.5,[np.sum(x) for x in shouldHaveBeenFirstIndexActuallyWasSecondIndex],width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex),alpha = 0.5,label="Actual Occurence Count for Each Class")
-
-			ax.set_ylabel('Target/Prediction Count for Each Class')
+			ax.set_title("Classification Result on 0-30/70-100 Split for Final Year by MLP",fontsize=25);
+			ax.set_ylabel('Target/Prediction Count for Each Class',fontsize=20)
 			ax.set_xticks(ind + width*len(shouldHaveBeenFirstIndexActuallyWasSecondIndex)*0.5)
-			ax.set_xticklabels(indexLabels)
-			ax.legend(bars,barLabels)
+			ax.set_xticklabels(indexLabels,fontsize=20)
+			ax.legend(bars,barLabels,fontsize=16)
 
 			# def autolabel(rects):
 			# 	for rect in rects:

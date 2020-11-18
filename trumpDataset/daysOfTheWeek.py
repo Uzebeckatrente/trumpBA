@@ -229,6 +229,159 @@ def graphPopularityByDayTime(tweets, years=4,numSegments = 8):
 	plt.show();
 	###transpose the x values
 
+def analyzeHashtagsAndAtTags(tweets, numYears = 4):
+	favsPerDayCount = {}
+	favs = [t[0] for t in tweets];
+	startingDate = tweets[0][4]
+	totalTime = tweets[-1][4] - tweets[0][4];
+	if numYears == 4:
+		timePerYear = datetime.timedelta(days=365)
+	else:
+		timePerYear = totalTime / numYears;
+	endingDate = startingDate + timePerYear
+	tweetsByYear = []
+	for year in range(numYears):
+		tweetsThisYear = [t for t in tweets if startingDate <= t[4] < endingDate]
+		tweetsByYear.append(tweetsThisYear)
+		startingDate += timePerYear;
+		endingDate += timePerYear;
+
+	symbols = [u'\uFF03', u'\uFF03']
+	hashTagMarker =  "$%s$" % symbols[0]
+	atMarker =  "$%s$" % symbols[1]
+
+
+	tweetsWithHashtags = [t for t in tweets if "#" in t[-1]]
+	textsWithHashtags = [t[-1] for t in tweetsWithHashtags]
+	tweetsWithAtTags = [t for t in tweets if "@" in t[-1]]
+	textsWithAtTags = [t[-1] for t in tweetsWithAtTags]
+	favsForTweetsWithHashtags = [t[0] for t in tweetsWithHashtags]
+	favsForTweetsWithAtTags = [t[0] for t in tweetsWithAtTags]
+
+	favsForTweetsSansHashtags = [t[0] for t in tweets if not "#" in t[-1]]
+	favsForTweetsSansAtTags = [t[0] for t in tweets if not "@" in t[-1]]
+
+	hashtags = []
+	for t in textsWithHashtags:
+		for w in t.split(" "):
+			w.lower()
+			if "#" in w:
+				w = w[w.index("#"):]
+				hashtags.append(re.sub(r'[^a-zA-Z0-9_#]', '', w.lower()))
+
+	atTags = []
+	for t in textsWithAtTags:
+		for w in t.split(" "):
+			w.lower()
+			if "@" in w:
+				w = w[w.index("@"):]
+				atTags.append(re.sub(r'[^a-zA-Z0-9_@]', '', w.lower()))
+
+	hashTagDict = {}
+	for tag in hashtags:
+		if tag not in hashTagDict:
+			hashTagDict[tag] = 1;
+		else:
+			hashTagDict[tag] += 1;
+	hashTagsAndCounts = list(hashTagDict.items());
+	hashTagsAndCounts.sort(key = lambda tup: tup[1],reverse=True);
+
+	atTagDict = {}
+	for tag in atTags:
+		if tag not in atTagDict:
+			atTagDict[tag] = 1;
+		else:
+			atTagDict[tag] += 1;
+	atTagsAndCounts = list(atTagDict.items());
+	atTagsAndCounts.sort(key=lambda tup: tup[1],reverse=True);
+	print(atTagsAndCounts)
+	print(hashTagsAndCounts)
+	custom_lines = []
+	labels = []
+	if False:
+		fig, axOneYear = plt.subplots(nrows=1, ncols = 1);
+		#axOneYear = axes[0]
+		# axAllYears = axes[1]
+
+
+		myColor = "#000000"
+		axOneYear.text(0, np.mean(favsForTweetsWithHashtags), u'\u0023', fontname='STIXGeneral', size=20+18*len(favsForTweetsWithHashtags)/len(tweets), va='center', ha='center', clip_on=True)
+		axOneYear.text(1, np.mean(favsForTweetsSansHashtags), u'\u0023', fontname='STIXGeneral', size=20+18*len(favsForTweetsSansHashtags)/len(tweets), va='center', ha='center', clip_on=True)
+
+		# axOneYear.scatter([0,1],[np.mean(favsForTweetsWithHashtags),np.mean(favsForTweetsSansHashtags)],c=myColor,s=[len(tweetsWithHashtags),len(favsForTweetsSansHashtags)],marker=hashTagMarker);
+		axOneYear.plot([0,1],[np.mean(favsForTweetsWithHashtags),np.mean(favsForTweetsSansHashtags)], c=myColor,linewidth=0.5);
+		# custom_lines.append(Line2D([0], [0], color=myColor, markersize=10,linestyle='None',marker=hashTagMarker))
+		# labels.append("Hashtags")
+
+		# myColor = randomHexColor()
+		# axOneYear.scatter([0, 1], [np.mean(favsForTweetsWithAtTags), np.mean(favsForTweetsSansAtTags)], c=myColor, s=[len(tweetsWithAtTags),len(favsForTweetsSansAtTags)],marker=atMarker);
+		axOneYear.text(0, np.mean(favsForTweetsWithAtTags), u'\u0040', fontname='STIXGeneral', size=20+18*len(favsForTweetsWithAtTags)/len(tweets), va='center', ha='center', clip_on=True)
+		axOneYear.text(1, np.mean(favsForTweetsSansAtTags), u'\u0040', fontname='STIXGeneral', size=20+18*len(favsForTweetsSansAtTags)/len(tweets), va='center', ha='center', clip_on=True)
+		axOneYear.plot([0, 1], [np.mean(favsForTweetsWithAtTags), np.mean(favsForTweetsSansAtTags)], c=myColor, linewidth=0.5);
+
+		axOneYear.set_ylim([60000, 110000])
+		axOneYear.set_xticks([0, 1]);
+		axOneYear.set_xticklabels(["Contains", "Doesn't\nContain"],fontsize=20);
+		# axOneYear.set_yticklabels( fontsize=20);
+		axOneYear.tick_params(axis='both', which='major', labelsize=20)
+		# axOneYear.set_title("All Years")
+		axOneYear.xaxis.grid(False)
+		axOneYear.set_xlim([-0.1, 1.1])
+		axOneYear.set_ylabel("Mean Popularity",fontsize=20)
+		fig.suptitle("Tweets " + r"$\bf{" + "Without" + "}$ @ and # Symbols are More Popular\n",fontsize=25)
+		plt.show()
+
+	fig, axAllYears = plt.subplots(nrows=1, ncols=1);
+	#axAllYears = axes[0]
+	# custom_lines.append(Line2D([0], [0], color=myColor, markersize=10,linestyle='None',marker=atMarker))
+	# labels.append("Acct Tags")
+	# axOneYear.legend(custom_lines, labels, loc="lower right", fontsize=20)
+
+	np.random.seed(69696969)
+	for year in range(numYears):
+		if year == 2:
+			np.random.seed(696969)
+		myColor = randomHexColor()
+		tweetsThisYear = tweetsByYear[year];
+		favsThisYear = [t[0] for t in tweetsThisYear];
+
+		tweetsWithHashtagsThisYear = [t for t in tweetsThisYear if "#" in t[-1]]
+		textsWithHashtagsThisYear = [t[-1] for t in tweetsWithHashtagsThisYear]
+		tweetsWithAtTagsThisYear = [t for t in tweetsThisYear if "@" in t[-1]]
+		textsWithAtTagsThisYear = [t[-1] for t in tweetsWithAtTagsThisYear]
+		favsForTweetsWithHashtagsThisYear = [t[0] for t in tweetsWithHashtagsThisYear]
+		favsForTweetsWithAtTagsThisYear = [t[0] for t in tweetsWithAtTagsThisYear]
+
+		favsForTweetsSansHashtagsThisYear = [t[0] for t in tweetsThisYear if not "#" in t[-1]]
+		favsForTweetsSansAtTagsThisYear = [t[0] for t in tweetsThisYear if not "@" in t[-1]]
+		# axAllYears.scatter([0, 1], [np.mean(favsForTweetsWithHashtagsThisYear), np.mean(favsForTweetsSansHashtagsThisYear)], c=myColor, s=[len(tweetsWithHashtagsThisYear), len(favsForTweetsSansHashtagsThisYear)],marker=hashTagMarker);
+		axAllYears.text(0, np.mean(favsForTweetsWithHashtagsThisYear), u'\u0023', color=myColor,fontname='STIXGeneral', size=20+18*len(favsForTweetsWithHashtagsThisYear)/len(favsThisYear), va='center', ha='center', clip_on=True)
+		axAllYears.text(1, np.mean(favsForTweetsSansHashtagsThisYear), u'\u0023', color=myColor,fontname='STIXGeneral', size=20+18*len(favsForTweetsSansHashtagsThisYear)/len(favsThisYear), va='center', ha='center', clip_on=True)
+
+		axAllYears.plot([0, 1], [np.mean(favsForTweetsWithHashtagsThisYear), np.mean(favsForTweetsSansHashtagsThisYear)], c=myColor, linewidth=0.5);
+
+		axAllYears.text(0, np.mean(favsForTweetsWithAtTagsThisYear), u'\u0040', color=myColor,fontname='STIXGeneral', size=20+18*len(favsForTweetsWithAtTagsThisYear)/len(favsThisYear), va='center', ha='center', clip_on=True)
+		axAllYears.text(1, np.mean(favsForTweetsSansAtTagsThisYear), u'\u0040', color=myColor,fontname='STIXGeneral', size=20+18*len(favsForTweetsSansAtTagsThisYear)/len(favsThisYear), va='center', ha='center', clip_on=True)
+		# axAllYears.scatter([0, 1], [np.mean(favsForTweetsWithAtTagsThisYear), np.mean(favsForTweetsSansAtTagsThisYear)], c=myColor, s=[len(tweetsWithAtTags), len(favsForTweetsSansAtTags)], marker=atMarker);
+		axAllYears.plot([0, 1], [np.mean(favsForTweetsWithAtTagsThisYear), np.mean(favsForTweetsSansAtTagsThisYear)], c=myColor, linewidth=0.5);
+		print(len(favsForTweetsWithAtTagsThisYear),len(favsForTweetsWithHashtagsThisYear))
+		custom_lines.append(Line2D([0], [0], color=myColor, lw=4))
+		labels.append("Year "+str(year+1))
+	axAllYears.set_xticks([0,1]);
+	axAllYears.set_xticklabels(["Contains", "Doesn't\nContain"],fontsize=20);
+	axAllYears.legend(custom_lines,labels,fontsize=20);
+	axAllYears.tick_params(axis='both', which='major', labelsize=20)
+	# axAllYears.set_title("Split by Year")
+	axAllYears.xaxis.grid(False)
+	axAllYears.set_xlim([-0.1,1.1])
+	axAllYears.set_ylabel("Mean Popularity",fontsize=20)
+	axAllYears.set_ylim([50000, 200000])
+
+	fig.suptitle("Tweets " + r"$\bf{" + "Without" + "}$ @ and # Symbols are More Popular\n",fontsize=25)
+
+	plt.show()
+
+
 
 def graphPopularityByTweetsPerDay(tweets, numYears = 4):
 	tweets.sort(key=lambda tup: tup[4])

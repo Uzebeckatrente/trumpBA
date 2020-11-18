@@ -800,6 +800,7 @@ def graphFavCount(tweets = None, title=""):
 	plt.show()
 
 
+
 def graphFavCountAndDerivative():
 	tweets = getTweetsFromDB(purePres=True,returnParams=["favCount"],orderBy="favCount asc");
 	favCounts = [t[0] for t in tweets];
