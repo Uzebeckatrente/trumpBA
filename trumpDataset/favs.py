@@ -386,6 +386,10 @@ def analyzeSentimentSkewsVader(tweets,loadFromStorage = True,ns = [1,2,3,4],minC
 
 	skewsMedian = []
 	vadersMedian = []
+	skewsMeanForWordsWithPositiveSentiment = []
+	skewsMeanForWordsWithNegativeSentiment = []
+	skewsMedianForWordsWithPositiveSentiment = []
+	skewsMedianForWordsWithNegativeSentiment = []
 	for tupIndex in [(x+1)*-1 for x in list(range(int(len(nGramsWithFavsMinusMean)*0.1)))]+list(range(int(len(nGramsWithFavsMinusMean)*0.1)))[::-1]:
 	# for tupIndex in list(range(200))[::-1]:
 		tupMean = nGramsWithFavsMinusMean[tupIndex]
@@ -403,6 +407,10 @@ def analyzeSentimentSkewsVader(tweets,loadFromStorage = True,ns = [1,2,3,4],minC
 			skewsMean.append(tupMean[nGramStorageIndicesSkew["skew"]])
 			vaderMean = sentiment_analyzer.polarity_scores(nGramMean)["compound"];
 			vadersMean.append(vaderMean);
+			if vaderMean > 0:
+				skewsMeanForWordsWithPositiveSentiment.extend(tupMean[nGramStorageIndicesSkew["favs"]])
+			else:
+				skewsMeanForWordsWithNegativeSentiment.extend(tupMean[nGramStorageIndicesSkew["favs"]])
 
 		medianIn = False;
 		for nGram in nGramMedian.split(" "):
@@ -414,8 +422,22 @@ def analyzeSentimentSkewsVader(tweets,loadFromStorage = True,ns = [1,2,3,4],minC
 			skewsMedian.append(tupMedian[nGramStorageIndicesSkew["skew"]])
 			vaderMedian = sentiment_analyzer.polarity_scores(nGramMedian)["compound"];
 			vadersMedian.append(vaderMedian);
+			if vaderMedian > 0:
+				skewsMedianForWordsWithPositiveSentiment.extend(tupMedian[nGramStorageIndicesSkew["favs"]])
+			else:
+				skewsMedianForWordsWithNegativeSentiment.extend(tupMedian[nGramStorageIndicesSkew["favs"]])
+
+
 	print(list(zip(vadersMean,skewsMean)))
 	print(list(zip(vadersMedian,skewsMedian)))
+	print(np.mean(skewsMeanForWordsWithPositiveSentiment));
+	print(np.mean(skewsMeanForWordsWithNegativeSentiment));
+	print(np.mean(skewsMedianForWordsWithPositiveSentiment));
+	print(np.mean(skewsMedianForWordsWithNegativeSentiment));
+
+
+
+
 	skewsMedian = [x/(np.max(skewsMedian)-np.min(skewsMedian)) for x in skewsMedian]
 	skewsMedian = [(x - np.min(skewsMedian))*2-1 for x in skewsMedian]
 	# plt.plot([i for i in range(len(skewsMean))],skewsMean,label="skews mean")

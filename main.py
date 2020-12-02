@@ -125,7 +125,7 @@ allPresTweetsFavCountAndCleanedText = getTweetsFromDB(purePres=True,conditions=[
 #
 # exit()
 
-# analyzeSentimentSkewsVader(allPresTweetsFavCountAndCleanedText);
+analyzeSentimentSkewsVader(allPresTweetsFavCountAndCleanedText);
 # favs = [t[0] for t in allPresTweetsFavCountAndCleanedText];
 # histogramFavCounts(favs);
 # exit()
